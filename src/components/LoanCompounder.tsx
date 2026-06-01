@@ -13,16 +13,22 @@ interface LoanCompounderProps {
   theme: EchelonTheme;
   loans: Loan[];
   onAddLoan: (loan: Omit<Loan, 'id' | 'lastUpdated'>) => void;
+  onUpdateLoan?: (id: string, loan: Omit<Loan, 'id' | 'lastUpdated'>) => void;
   onAddLoanRepayment: (id: string, amount: number) => void;
   onRemoveLoan: (id: string) => void;
+  currencySymbol?: string;
+  onOpenSettings?: () => any;
 }
 
 export default function LoanCompounder({
   theme,
   loans,
   onAddLoan,
+  onUpdateLoan,
   onAddLoanRepayment,
   onRemoveLoan,
+  currencySymbol = '₹',
+  onOpenSettings,
 }: LoanCompounderProps) {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
@@ -147,13 +153,13 @@ export default function LoanCompounder({
             </div>
 
             <div>
-              <label htmlFor="loan-form-principal" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Original Principal (INR)</label>
+              <label htmlFor="loan-form-principal" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Original Principal</label>
               <input
                 type="number"
                 id="loan-form-principal"
                 required
                 min="1"
-                placeholder="₹ Principal"
+                placeholder={`${currencySymbol} Principal`}
                 value={principal}
                 onChange={(e) => setPrincipal(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -283,7 +289,7 @@ export default function LoanCompounder({
                   <div className="bg-stone-500/5 hover:bg-stone-500/10 p-3 rounded-xl mt-4 grid grid-cols-2 gap-2 border border-stone-500/10">
                     <div>
                       <span className="text-[10px] uppercase text-stone-500 font-mono block">Orig. Principal</span>
-                      <span className={`text-sm font-semibold font-mono ${tokens.textPrimary}`}>₹{loan.principal.toLocaleString('en-IN')}</span>
+                      <span className={`text-sm font-semibold font-mono ${tokens.textPrimary}`}>{currencySymbol}{loan.principal.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Rate</span>
@@ -291,18 +297,18 @@ export default function LoanCompounder({
                     </div>
                     <div>
                       <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Int.</span>
-                      <span className="text-sm font-semibold font-mono text-amber-600">₹{totalAccInterest.toLocaleString('en-IN')}</span>
+                      <span className="text-sm font-semibold font-mono text-amber-600">{currencySymbol}{totalAccInterest.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase text-stone-500 font-mono block">Total Repaid</span>
-                      <span className="text-sm font-semibold font-mono text-stone-400">₹{loan.manualPayments.toLocaleString('en-IN')}</span>
+                      <span className="text-sm font-semibold font-mono text-stone-400">{currencySymbol}{loan.manualPayments.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
                   <div className="mt-4 flex justify-between items-baseline">
                     <span className="text-xs uppercase font-bold text-stone-500 font-mono">Current Balance</span>
                     <span className={`text-xl font-mono font-black ${isLent ? 'text-emerald-500' : 'text-red-500'}`}>
-                      ₹{currentBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {currencySymbol}{currentBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -314,7 +320,7 @@ export default function LoanCompounder({
                       <input
                         type="number"
                         id={`repay-input-${loan.id}`}
-                        placeholder="Repayment amount ₹"
+                        placeholder={`Repayment amount ${currencySymbol}`}
                         value={repayVal}
                         onChange={(e) => setRepayVal(e.target.value)}
                         className={`flex-1 px-2 py-1 bg-stone-900 border ${tokens.border} text-xs font-mono rounded-lg text-stone-200 focus:outline-none focus:border-amber-500`}

@@ -8,15 +8,25 @@ import { Shield, Eye, EyeOff, KeyRound, LockKeyhole, Info } from 'lucide-react';
 import { EchelonTheme } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { hashPin } from '../utils/security';
+import { EchelonIcon } from './CoolIcons';
 
 interface PasscodeScreenProps {
   theme: EchelonTheme;
   pinHash: string;
   onUnlock: (pin: string) => boolean;
   onSetPin: (newPin: string) => void;
+  outerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
+  innerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
 }
 
-export default function PasscodeScreen({ theme, pinHash, onUnlock, onSetPin }: PasscodeScreenProps) {
+export default function PasscodeScreen({ 
+  theme, 
+  pinHash, 
+  onUnlock, 
+  onSetPin,
+  outerIcon = 'stealth-matte-gold',
+  innerIcon = 'regal-obsidian-gold',
+}: PasscodeScreenProps) {
   const [pin, setPin] = useState<string>('');
   const [confirmPin, setConfirmPin] = useState<string>('');
   const [isRegistering, setIsRegistering] = useState<boolean>(!pinHash);
@@ -77,22 +87,6 @@ export default function PasscodeScreen({ theme, pinHash, onUnlock, onSetPin }: P
     setTimeout(() => setShake(false), 500);
   };
 
-  const handleUnlockWithDemo = () => {
-    if (isRegistering) {
-      setPin('1234');
-      setConfirmPin('1234');
-      onSetPin('1234');
-    } else {
-      setPin('1234');
-      const success = onUnlock('1234');
-      if (!success) {
-        // If pincell isn't 1234, try setting it to 1234
-        onSetPin('1234');
-        onUnlock('1234');
-      }
-    }
-  };
-
   return (
     <div id="secure-unlock-screen" className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-500 ${tokens.bg}`}>
       
@@ -106,13 +100,10 @@ export default function PasscodeScreen({ theme, pinHash, onUnlock, onSetPin }: P
         
         {/* Top Header Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mb-4 border ${tokens.borderAccent} bg-opacity-10 bg-amber-500`}>
-            {isRegistering ? (
-              <KeyRound className="h-8 w-8 text-amber-500" />
-            ) : (
-              <LockKeyhole className="h-8 w-8 text-amber-500" />
-            )}
+          <div className="h-16 w-16 bg-[#141517] rounded-3xl border border-stone-800 p-1.5 flex items-center justify-center shadow-2xl mb-4 select-none">
+            <EchelonIcon name={outerIcon} size="100%" />
           </div>
+
           <h1 className={`text-2xl font-bold tracking-tight ${tokens.textPrimary}`}>ECHELON</h1>
           <p className={`text-xs uppercase tracking-widest font-mono text-amber-500 mt-1`}>BUILD QUIET WEALTH</p>
           <div className="flex items-center gap-1.5 mt-2 text-xs bg-stone-300/10 px-2.5 py-1 rounded-full text-zinc-400">
@@ -189,25 +180,24 @@ export default function PasscodeScreen({ theme, pinHash, onUnlock, onSetPin }: P
           </button>
         </div>
 
-        {/* Quick Demo Bypass */}
-        <div className="pt-4 border-t border-dashed border-stone-800">
-          <div className="bg-stone-500/5 hover:bg-stone-500/10 border border-stone-400/10 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all">
-            <div className="flex items-center gap-1.5 text-xs text-amber-500/90 font-mono">
-              <Info className="h-3.5 w-3.5" />
-              <span>TESTER / ACCESS NOTICE</span>
-            </div>
-            <p className="text-[11px] text-stone-500">
-              For immediate testing, use PIN <span className="font-bold text-amber-500">1234</span>
-            </p>
-            <button
-              type="button"
-              id="bypass-auth-btn"
-              onClick={handleUnlockWithDemo}
-              className="mt-1 text-xs px-4 py-1.5 rounded-lg bg-zinc-800 text-stone-300 font-semibold hover:bg-zinc-700 active:scale-95 transition-all border border-stone-700"
-            >
-              {isRegistering ? 'Setup with Default 1234' : 'Unlock with Default 1234'}
-            </button>
-          </div>
+        {/* Forgot PIN Purge Mechanism */}
+        <div className="pt-5 border-t border-dashed border-stone-800 mt-4">
+          <p className="text-[10px] text-stone-500 mb-2 leading-relaxed">
+            Forget your passcode? You can hard-reset your Echelon database. Doing so will permanently delete all records inside this browser storage namespace.
+          </p>
+          <button
+            type="button"
+            id="forgot-pin-reset-app-btn"
+            onClick={() => {
+              if (window.confirm("CRITICAL WARNING: This will permanently purge and wipe out ALL of your locally encrypted treasury data, assets, budget, and configurations. There is NO recovery. Do you want to format and reset your PIN?")) {
+                localStorage.clear();
+                window.location.reload();
+              }
+            }}
+            className="text-[10px] text-rose-500 hover:text-rose-400 font-mono font-bold uppercase tracking-wider transition-all border border-rose-500/10 px-3 py-1.5 rounded-xl bg-rose-500/5 hover:bg-rose-500/10"
+          >
+            Purge Ledger DB & Reset PIN
+          </button>
         </div>
 
       </div>

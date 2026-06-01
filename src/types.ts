@@ -40,6 +40,8 @@ export interface Asset {
   annualGrowthRate?: number; // Optional annual growth / APY percentage
   notes?: string;
   lastUpdated: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface Loan {
@@ -85,6 +87,23 @@ export interface EchelonTheme {
   palette: 'black' | 'silver' | 'blue' | 'elegant-dark';
 }
 
+export interface BudgetCategoryLimit {
+  category: string;
+  limit: number;
+}
+
+export interface CustomField {
+  label: string;
+  value: string;
+}
+
+export interface CustomThemeConfig {
+  id: string;
+  name: string;
+  primaryColor: string; // Custom Hex accent color code
+  bgMode: 'dark' | 'light';
+}
+
 export interface EchelonState {
   version: number;
   isLocked: boolean;
@@ -97,4 +116,16 @@ export interface EchelonState {
   monthlyEarnings: number; // configured monthly recurring earnings
   theme: EchelonTheme;
   archivedReportMonths: string[]; // Keep track of archived months (YYYY-MM)
+  budgetCategoryLimits?: BudgetCategoryLimit[];
+  customFields?: CustomField[];
+  selectedGalleryIcon?: 'gold-shield' | 'watch-chrono' | 'stealth-carbon';
+  outerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
+  innerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
+  userName?: string; // Customizable name for user profile reports
+  customThemeConfigs?: CustomThemeConfig[]; // User's self-configured themes
+  activeAccentColor?: string; // Overriding color for amber-500
+  currencySymbol?: string; // Denomination override, e.g. "₹", "$", etc.
+  customSavingsGoalAmt?: number; // Custom user desired savings override
+  userOverriddenExpenses?: number; // Custom decisive monthly expense flow rate
+  customAlertRules?: string[]; // Custom defined threshold rules or alerting limits
 }

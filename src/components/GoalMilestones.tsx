@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Calendar, Award, Compass, Timer, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, Calendar, Award, Compass, Timer, AlertTriangle, ShieldCheck, Edit3, X, CheckSquare } from 'lucide-react';
 import { EchelonTheme, FinancialGoal } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { estimateTimeToGoal } from '../utils/math';
@@ -15,7 +15,9 @@ interface GoalMilestonesProps {
   totalPortfolioValue: number;
   netYearlyFlow: number;
   onAddGoal: (goal: Omit<FinancialGoal, 'id'>) => void;
+  onUpdateGoal?: (id: string, goal: Omit<FinancialGoal, 'id'>) => void;
   onRemoveGoal: (id: string) => void;
+  currencySymbol?: string;
 }
 
 export default function GoalMilestones({
@@ -24,13 +26,44 @@ export default function GoalMilestones({
   totalPortfolioValue,
   netYearlyFlow,
   onAddGoal,
+  onUpdateGoal,
   onRemoveGoal,
+  currencySymbol = '₹',
 }: GoalMilestonesProps) {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
   const [targetAmount, setTargetAmount] = useState<string>('');
   const [deadlineDate, setDeadlineDate] = useState<string>('');
   const [category, setCategory] = useState<string>('Capital Base');
+
+  // Goals CRUD edit states
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editName, setEditName] = useState<string>('');
+  const [editTarget, setEditTarget] = useState<string>('');
+  const [editDeadline, setEditDeadline] = useState<string>('');
+  const [editCategory, setEditCategory] = useState<string>('Capital Base');
+
+  const handleStartEditGoal = (g: FinancialGoal) => {
+    setEditingGoalId(g.id);
+    setEditName(g.name);
+    setEditTarget(g.targetAmount.toString());
+    setEditDeadline(g.deadlineDate);
+    setEditCategory(g.category);
+  };
+
+  const handleSaveEditGoal = (id: string) => {
+    const tgt = parseFloat(editTarget);
+    if (!editName || isNaN(tgt)) return;
+    if (onUpdateGoal) {
+      onUpdateGoal(id, {
+        name: editName,
+        targetAmount: tgt,
+        deadlineDate: editDeadline,
+        category: editCategory,
+      });
+    }
+    setEditingGoalId(null);
+  };
 
   const tokens = getColorTokens(theme);
 
@@ -109,7 +142,7 @@ export default function GoalMilestones({
                 type="text"
                 id="goal-form-name"
                 required
-                placeholder="e.g. Dream Retreat, ₹1Cr Sovereign Fund"
+                placeholder={`e.g. Dream Retreat, ${currencySymbol}1Cr Sovereign Fund`}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -117,13 +150,13 @@ export default function GoalMilestones({
             </div>
 
             <div>
-              <label htmlFor="goal-form-target" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Target Threshold (INR)</label>
+              <label htmlFor="goal-form-target" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Target Threshold</label>
               <input
                 type="number"
                 id="goal-form-target"
                 required
                 min="1000"
-                placeholder="₹ Target amount"
+                placeholder={`${currencySymbol} Target amount`}
                 value={targetAmount}
                 onChange={(e) => setTargetAmount(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -192,86 +225,176 @@ export default function GoalMilestones({
             // Percentage toward goal
             const progress = totalPortfolioValue > 0 
               ? Math.max(0, Math.min(100, (totalPortfolioValue / g.targetAmount) * 100))
-              : 0;
+              : 0;              const isEditing = editingGoalId === g.id;
 
-            return (
-              <div
-                key={g.id}
-                className={`p-5 rounded-2xl border ${tokens.card} flex flex-col justify-between hover:scale-[1.01] transition-all`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-bold font-mono uppercase bg-stone-500/10 border border-stone-500/15 px-2 py-0.5 rounded text-stone-400">
-                      {g.category}
-                    </span>
-                    <button
-                      type="button"
-                      id={`delete-goal-btn-${g.id}`}
-                      onClick={() => onRemoveGoal(g.id)}
-                      className="p-1 rounded hover:bg-red-500/15 text-stone-550 hover:text-red-500 transition-colors"
-                      title="Forfeit Ambition"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-start gap-2 mb-2">
-                    <Compass className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <h3 className={`text-base font-bold ${tokens.textPrimary}`}>{g.name}</h3>
-                      <p className="text-[11px] text-stone-500 flex items-center gap-1 mt-0.5">
-                        <Calendar className="h-3 w-3" />
-                        <span>Deadline Target: {new Date(g.deadlineDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Pricing specs */}
-                  <div className="my-4 space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Target Cap</span>
-                      <span className={`text-lg font-mono font-black ${tokens.textPrimary}`}>₹{g.targetAmount.toLocaleString('en-IN')}</span>
-                    </div>
-
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Status Indicator</span>
-                      <span className={`text-[10px] font-bold uppercase border px-2 py-0.5 rounded-full ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </div>
-
-                    {/* Progress tracking line */}
-                    <div>
-                      <div className="w-full h-1.5 bg-stone-500/10 rounded-full overflow-hidden mb-1">
-                        <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+              if (isEditing) {
+                return (
+                  <div
+                    key={g.id}
+                    className={`p-5 rounded-2xl border border-amber-500/30 bg-zinc-950 flex flex-col justify-between space-y-3 animate-fade-in text-xs`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider">
+                        <span>Edit Goal Parameters</span>
+                        <button type="button" onClick={() => setEditingGoalId(null)} className="text-stone-500 hover:text-stone-200">
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
-                      <span className="text-[9px] text-stone-500 font-mono font-bold block text-right">{progress.toFixed(0)}% Secured</span>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-0.5">Category Domain</label>
+                        <select
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value)}
+                          className={`w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white focus:outline-none`}
+                        >
+                          <option value="Capital Base">Capital Base</option>
+                          <option value="Sovereign Fund">Sovereign Fund</option>
+                          <option value="Leisure Estate">Leisure Estate</option>
+                          <option value="Active Shield">Active Shield</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-0.5">Goal Description</label>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-0.5">Target Amount</label>
+                        <input
+                          type="number"
+                          value={editTarget}
+                          onChange={(e) => setEditTarget(e.target.value)}
+                          className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-0.5">Deadline</label>
+                        <input
+                          type="date"
+                          value={editDeadline}
+                          onChange={(e) => setEditDeadline(e.target.value)}
+                          className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-1.5 pt-2 border-t border-stone-900">
+                      <button
+                        type="button"
+                        onClick={() => setEditingGoalId(null)}
+                        className="text-[10px] text-stone-400 hover:text-stone-300 font-semibold px-2 py-1"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEditGoal(g.id)}
+                        className="text-[10px] font-bold px-3 py-1 bg-amber-500 text-stone-950 rounded-lg flex items-center gap-1 hover:bg-amber-400 transition-all shadow"
+                      >
+                        <CheckSquare className="h-3 w-3" />
+                        <span>Save</span>
+                      </button>
                     </div>
                   </div>
-                </div>
+                );
+              }
 
-                {/* dynamic dynamic timeline projection results */}
-                <div className="mt-4 pt-3 border-t border-dashed border-stone-800/15 dark:border-stone-100/10 text-xs leading-relaxed text-stone-400">
-                  {yearsToGoal === 0 ? (
-                    <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>{status.desc}</span>
-                    </span>
-                  ) : yearsToGoal === Infinity ? (
-                    <span className="text-red-500 font-semibold flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4 animate-bounce" />
-                      <span>{status.desc}</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-stone-300">
-                      <Timer className="h-4 w-4 text-amber-500" />
-                      <span>{status.desc}</span>
-                    </span>
-                  )}
-                </div>
+              return (
+                <div
+                  key={g.id}
+                  className={`p-5 rounded-2xl border ${tokens.card} flex flex-col justify-between hover:scale-[1.01] transition-all`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[10px] font-bold font-mono uppercase bg-stone-500/10 border border-stone-500/15 px-2 py-0.5 rounded text-stone-400">
+                        {g.category}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditGoal(g)}
+                          className="p-1 rounded hover:bg-amber-500/15 text-stone-550 hover:text-amber-500 transition-colors"
+                          title="Modify Goal"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          id={`delete-goal-btn-${g.id}`}
+                          onClick={() => onRemoveGoal(g.id)}
+                          className="p-1 rounded hover:bg-red-500/15 text-stone-550 hover:text-red-500 transition-colors"
+                          title="Forfeit Ambition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
 
-              </div>
-            );
+                    <div className="flex items-start gap-2 mb-2">
+                      <Compass className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className={`text-base font-bold ${tokens.textPrimary}`}>{g.name}</h3>
+                        <p className="text-[11px] text-stone-500 flex items-center gap-1 mt-0.5">
+                          <Calendar className="h-3 w-3" />
+                          <span>Deadline Target: {new Date(g.deadlineDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pricing specs */}
+                    <div className="my-4 space-y-2">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Target Cap</span>
+                        <span className={`text-lg font-mono font-black ${tokens.textPrimary}`}>{currencySymbol}{g.targetAmount.toLocaleString('en-IN')}</span>
+                      </div>
+
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Status Indicator</span>
+                        <span className={`text-[10px] font-bold uppercase border px-2 py-0.5 rounded-full ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </div>
+
+                      {/* Progress tracking line */}
+                      <div>
+                        <div className="w-full h-1.5 bg-stone-500/10 rounded-full overflow-hidden mb-1">
+                          <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                        </div>
+                        <span className="text-[9px] text-stone-500 font-mono font-bold block text-right">{progress.toFixed(0)}% Secured</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* dynamic dynamic timeline projection results */}
+                  <div className="mt-4 pt-3 border-t border-dashed border-stone-800/15 dark:border-stone-100/10 text-xs leading-relaxed text-stone-400">
+                    {yearsToGoal === 0 ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>{status.desc}</span>
+                      </span>
+                    ) : yearsToGoal === Infinity ? (
+                      <span className="text-red-500 font-semibold flex items-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4 animate-bounce" />
+                        <span>{status.desc}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-stone-300">
+                        <Timer className="h-4 w-4 text-amber-500" />
+                        <span>{status.desc}</span>
+                      </span>
+                    )}
+                  </div>
+
+                </div>
+              );
           })}
         </div>
       )}

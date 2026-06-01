@@ -16,6 +16,10 @@ interface HoldingSummaryProps {
   monthlyEarnings: number;
   expenses: Expense[];
   onSetMonthlyEarnings: (val: number) => void;
+  currencySymbol?: string;
+  customSavingsGoalAmt?: number;
+  userOverriddenExpenses?: number;
+  onOpenSettings?: () => any;
 }
 
 type PeriodType = 'hour' | 'day' | 'month' | 'year' | '5year';
@@ -26,7 +30,11 @@ export default function HoldingSummary({
   loans,
   monthlyEarnings,
   expenses,
-  onSetMonthlyEarnings
+  onSetMonthlyEarnings,
+  currencySymbol = '₹',
+  customSavingsGoalAmt,
+  userOverriddenExpenses,
+  onOpenSettings,
 }: HoldingSummaryProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [isEditingEarnings, setIsEditingEarnings] = useState<boolean>(false);
@@ -126,6 +134,16 @@ export default function HoldingSummary({
 
   const totalPie = categories.reduce((sum, c) => sum + c.amount, 0);
 
+  let totalYieldAmount = 0;
+  assets.forEach(a => {
+    const r = a.annualGrowthRate !== undefined 
+      ? a.annualGrowthRate 
+      : (a.type === 'FD' ? 7.1 : a.type === 'BOND' ? 8.5 : (a.type === 'EQUITY' || a.type === 'STOCK') ? 12 : 3.5);
+    totalYieldAmount += a.currentValue * (r / 100);
+  });
+  totalYieldAmount += totalLentVal * 0.12; 
+  const blendedAPY = totalPie > 0 ? (totalYieldAmount / totalPie) * 100 : 0;
+
   const handleSaveEarnings = () => {
     const val = parseFloat(earningsInput);
     if (!isNaN(val) && val >= 0) {
@@ -157,14 +175,14 @@ export default function HoldingSummary({
             <span className="text-xs uppercase font-bold tracking-widest text-amber-500 font-mono">Net Quiet Treasury Pool</span>
             <div className="flex items-center gap-1.5 text-xs text-stone-500 font-mono">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              <span>INR ₹ Ledger</span>
+              <span>{currencySymbol} Ledger</span>
             </div>
           </div>
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
             <div className="flex items-baseline gap-1">
               <h2 className={`text-3xl sm:text-5xl font-mono font-extrabold tracking-tight ${tokens.textPrimary}`}>
-                ₹{Math.floor(totalPortfolioValue + liveNetOffset).toLocaleString('en-IN')}
+                {currencySymbol}{Math.floor(totalPortfolioValue + liveNetOffset).toLocaleString('en-IN')}
               </h2>
               <span className="text-xl sm:text-2xl font-mono font-extrabold text-amber-500/90 tracking-tight animate-pulse shrink-0">
                 .{(Math.round(((totalPortfolioValue + liveNetOffset) % 1) * 100)).toString().padStart(2, '0')}
@@ -186,19 +204,19 @@ export default function HoldingSummary({
             <div>
               <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Gross Holds</span>
               <p className={`text-sm sm:text-base font-semibold font-mono ${tokens.textPrimary}`}>
-                ₹{totalAssetsVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                {currencySymbol}{totalAssetsVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Lent Out (+)</span>
               <p className="text-sm sm:text-base font-semibold font-mono text-emerald-500">
-                ₹{totalLentVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                {currencySymbol}{totalLentVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Borrowed (-)</span>
               <p className="text-sm sm:text-base font-semibold font-mono text-red-500">
-                ₹{totalBorrowedVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                {currencySymbol}{totalBorrowedVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </p>
             </div>
           </div>
@@ -212,7 +230,7 @@ export default function HoldingSummary({
               <p className="text-[10px] text-stone-500">Wealth progression curve assuming current growth velocity</p>
             </div>
             <span className="text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-              {forecastYears} Year Outlook: ₹{Math.floor(totalPortfolioValue + rates.netPerYear * forecastYears).toLocaleString('en-IN')}
+              {forecastYears} Year Outlook: {currencySymbol}{Math.floor(totalPortfolioValue + rates.netPerYear * forecastYears).toLocaleString('en-IN')}
             </span>
           </div>
 
@@ -282,7 +300,7 @@ export default function HoldingSummary({
                 <span className="text-emerald-500 font-semibold">Inflow Stream</span>
               </div>
               <p className={`text-2xl font-bold font-mono ${tokens.textPrimary}`}>
-                +₹{activePeriod.earnings.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                +{currencySymbol}{activePeriod.earnings.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
               </p>
             </div>
 
@@ -292,7 +310,7 @@ export default function HoldingSummary({
                 <span className="text-red-500 font-semibold">Sinks Stream</span>
               </div>
               <p className={`text-2xl font-bold font-mono ${tokens.textPrimary}`}>
-                -₹{activePeriod.losses.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                -{currencySymbol}{activePeriod.losses.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
               </p>
             </div>
 
@@ -305,7 +323,7 @@ export default function HoldingSummary({
                 </span>
               </div>
               <p className={`text-3xl font-extrabold font-mono ${activePeriod.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                ₹{activePeriod.net.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                {currencySymbol}{activePeriod.net.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
               </p>
             </div>
           </div>
@@ -336,7 +354,7 @@ export default function HoldingSummary({
                 </div>
               ) : (
                 <p className={`text-sm font-bold font-mono ${tokens.textPrimary}`}>
-                  ₹{monthlyEarnings.toLocaleString('en-IN')} /mo
+                  {currencySymbol}{monthlyEarnings.toLocaleString('en-IN')} /mo
                 </p>
               )}
             </div>
@@ -397,11 +415,11 @@ export default function HoldingSummary({
                     );
                   })}
                 </svg>
-                {/* Visual net worth ratio center metrics with custom percentage */}
+                {/* Visual weighted portfolio APY center metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-tight">
-                  <span className="text-[9px] uppercase font-bold text-stone-500 font-mono">Lent vs Asset</span>
-                  <span className={`text-base font-extrabold font-mono ${tokens.textPrimary}`}>
-                    {((totalLentVal / Math.max(1, totalPie)) * 100).toFixed(0)}% Credit
+                  <span className="text-[9px] uppercase font-bold text-stone-500 font-mono">Weighted Yield</span>
+                  <span className={`text-sm font-black font-mono ${tokens.textPrimary}`}>
+                    {blendedAPY.toFixed(1)}% APY
                   </span>
                 </div>
               </div>

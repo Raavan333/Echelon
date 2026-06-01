@@ -13,7 +13,10 @@ interface AssetManagerProps {
   assets: Asset[];
   onAddAsset: (asset: Omit<Asset, 'id' | 'lastUpdated'>) => void;
   onUpdateAssetValue: (id: string, value: number, returns: number, annualGrowthRate?: number) => void;
+  onUpdateAsset?: (id: string, asset: Omit<Asset, 'id' | 'lastUpdated'>) => void;
   onRemoveAsset: (id: string) => void;
+  currencySymbol?: string;
+  onOpenSettings?: () => any;
 }
 
 export default function AssetManager({
@@ -21,7 +24,10 @@ export default function AssetManager({
   assets,
   onAddAsset,
   onUpdateAssetValue,
+  onUpdateAsset,
   onRemoveAsset,
+  currencySymbol = '₹',
+  onOpenSettings,
 }: AssetManagerProps) {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
@@ -31,12 +37,16 @@ export default function AssetManager({
   const [realisedReturns, setRealisedReturns] = useState<string>('');
   const [annualGrowthRate, setAnnualGrowthRate] = useState<string>('12');
   const [notes, setNotes] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   // Editing state
   const [editId, setEditId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [editReturns, setEditReturns] = useState<string>('');
   const [editGrowthRate, setEditGrowthRate] = useState<string>('');
+  const [editStartDate, setEditStartDate] = useState<string>('');
+  const [editEndDate, setEditEndDate] = useState<string>('');
 
   const tokens = getColorTokens(theme);
 
@@ -64,6 +74,8 @@ export default function AssetManager({
       realisedReturns: parseFloat(realisedReturns) || 0,
       annualGrowthRate: parseFloat(annualGrowthRate) !== undefined ? parseFloat(annualGrowthRate) : 12,
       notes,
+      startDate: (type === AssetType.FD || type === AssetType.BOND) ? startDate : undefined,
+      endDate: (type === AssetType.FD || type === AssetType.BOND) ? endDate : undefined,
     });
 
     // Reset fields
@@ -74,6 +86,8 @@ export default function AssetManager({
     setRealisedReturns('');
     setAnnualGrowthRate('12');
     setNotes('');
+    setStartDate('');
+    setEndDate('');
     setShowAddForm(false);
   };
 
@@ -181,14 +195,14 @@ export default function AssetManager({
             </div>
 
             <div>
-              <label htmlFor="asset-form-valuation" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Current Valuation (INR)</label>
+              <label htmlFor="asset-form-valuation" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Current Valuation</label>
               <input
                 type="number"
                 id="asset-form-valuation"
                 required
                 min="0"
                 step="0.01"
-                placeholder="₹ Amount"
+                placeholder={`${currencySymbol} Amount`}
                 value={currentValue}
                 onChange={(e) => setCurrentValue(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -201,15 +215,16 @@ export default function AssetManager({
                 type="number"
                 id="asset-form-returns"
                 step="0.01"
-                placeholder="₹ Profit/Interest Realised"
+                placeholder={`${currencySymbol} Profit/Interest Realised`}
                 value={realisedReturns}
                 onChange={(e) => setRealisedReturns(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
               />
             </div>
-
             <div>
-              <label htmlFor="asset-form-growth" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Annual APY Growth / Return Rate (%)</label>
+              <label htmlFor="asset-form-growth" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">
+                {type === AssetType.STOCK ? 'Expected Return Rate / Target (%)' : 'Annual APY Growth / Return Rate (%)'}
+              </label>
               <input
                 type="number"
                 id="asset-form-growth"
@@ -219,14 +234,46 @@ export default function AssetManager({
                 onChange={(e) => setAnnualGrowthRate(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
               />
+              {type === AssetType.STOCK && (
+                <span className="text-[9px] text-amber-500 italic block mt-1 font-sans leading-none">
+                  ⚠️ Market volatile & non-fixed. Yield is estimated.
+                </span>
+              )}
             </div>
+
+            {(type === AssetType.FD || type === AssetType.BOND) && (
+              <>
+                <div>
+                  <label htmlFor="asset-form-start-date" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    id="asset-form-start-date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="asset-form-end-date" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">End Date (Liquidity Returns)</label>
+                  <input
+                    type="date"
+                    id="asset-form-end-date"
+                    required
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="md:col-span-2 lg:col-span-3">
               <label htmlFor="asset-form-notes" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Notes / APY Yield (Optional)</label>
               <input
                 type="text"
                 id="asset-form-notes"
-                placeholder="e.g. SBI Yield: 7.1%, Annual compounding"
+                placeholder={type === AssetType.STOCK ? 'e.g. Volatile delivery stocks' : 'e.g. SBI Yield: 7.1%, Annual compounding'}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -283,7 +330,46 @@ export default function AssetManager({
                       </div>
                       <div>
                         <p className={`text-sm font-bold ${tokens.textPrimary}`}>{asset.name}</p>
-                        {asset.notes && <p className="text-[10px] text-stone-500">{asset.notes}</p>}
+                        {asset.notes && <p className="text-[10px] text-stone-500 mb-1">{asset.notes}</p>}
+                        {(asset.type === AssetType.FD || asset.type === AssetType.BOND) && asset.startDate && asset.endDate && (() => {
+                          const start = new Date(asset.startDate).getTime();
+                          const end = new Date(asset.endDate).getTime();
+                          const now = Date.now();
+                          const total = end - start;
+                          let pct = 0;
+                          if (total > 0) {
+                            pct = Math.max(0, Math.min(100, ((now - start) / total) * 100));
+                          }
+                          const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+                          const isMatured = daysLeft <= 0;
+
+                          return (
+                            <div className="mt-1 max-w-xs space-y-0.5">
+                              <div className="flex items-center gap-2 text-[10px] font-mono">
+                                <span className={isMatured ? 'text-emerald-400 font-bold' : 'text-amber-500/80'}>
+                                  {isMatured ? '🎉 Matured' : `${pct.toFixed(0)}% Completed`}
+                                </span>
+                                <span className="text-stone-500">
+                                  {isMatured ? 'Liquid Available' : `• ${daysLeft} days left`}
+                                </span>
+                              </div>
+                              <div className="w-28 h-1.5 rounded-full bg-stone-300/10 border border-stone-800 p-0.5 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${isMatured ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {asset.type === AssetType.STOCK && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="h-1 w-1 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-[9px] uppercase font-bold text-amber-500/80 font-mono tracking-wide">
+                              Volatile Market Asset
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -310,7 +396,7 @@ export default function AssetManager({
                       />
                     ) : (
                       <p className="text-sm font-bold font-mono text-stone-200">
-                        ₹{asset.currentValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {currencySymbol}{asset.currentValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
                     )}
                   </td>
@@ -326,7 +412,7 @@ export default function AssetManager({
                       />
                     ) : (
                       <p className="text-sm font-bold font-mono text-emerald-500">
-                        ₹{asset.realisedReturns.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {currencySymbol}{asset.realisedReturns.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
                     )}
                   </td>
