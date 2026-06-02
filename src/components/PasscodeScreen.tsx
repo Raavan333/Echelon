@@ -15,8 +15,7 @@ interface PasscodeScreenProps {
   pinHash: string;
   onUnlock: (pin: string) => boolean;
   onSetPin: (newPin: string) => void;
-  outerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
-  innerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
+  selectedGalleryIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
 }
 
 export default function PasscodeScreen({ 
@@ -24,8 +23,7 @@ export default function PasscodeScreen({
   pinHash, 
   onUnlock, 
   onSetPin,
-  outerIcon = 'stealth-matte-gold',
-  innerIcon = 'regal-obsidian-gold',
+  selectedGalleryIcon = 'stealth-matte-gold',
 }: PasscodeScreenProps) {
   const [pin, setPin] = useState<string>('');
   const [confirmPin, setConfirmPin] = useState<string>('');
@@ -101,7 +99,7 @@ export default function PasscodeScreen({
         {/* Top Header Logo */}
         <div className="flex flex-col items-center mb-6">
           <div className="h-16 w-16 bg-[#141517] rounded-3xl border border-stone-800 p-1.5 flex items-center justify-center shadow-2xl mb-4 select-none">
-            <EchelonIcon name={outerIcon} size="100%" />
+            <EchelonIcon name={selectedGalleryIcon || 'stealth-matte-gold'} size="100%" />
           </div>
 
           <h1 className={`text-2xl font-bold tracking-tight ${tokens.textPrimary}`}>ECHELON</h1>

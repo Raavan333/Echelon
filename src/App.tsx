@@ -83,9 +83,7 @@ const createInitialState = (): EchelonState => ({
   archivedReportMonths: [],
   budgetCategoryLimits: [],
   customFields: [],
-  selectedGalleryIcon: 'gold-shield',
-  outerIcon: 'stealth-matte-gold',
-  innerIcon: 'regal-obsidian-gold',
+  selectedGalleryIcon: 'stealth-matte-gold',
 });
 
 export default function App() {
@@ -94,21 +92,15 @@ export default function App() {
   const [activePin, setActivePin] = useState<string>(''); // Kept safe in-memory to re-encrypt on modifications
   const [vaultData, setVaultData] = useState<EchelonState | null>(null);
 
-  // Read non-cryptographic public icons configuration instantly for passcode screen fallback
-  const [publicIcons, setPublicIcons] = useState<{
-    outerIcon: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
-    innerIcon: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
-  }>(() => {
+  // Read non-cryptographic public icon configuration instantly for passcode screen fallback
+  const [publicIcon, setPublicIcon] = useState<'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold'>(() => {
     try {
-      const stored = localStorage.getItem('echelon_public_icons');
+      const stored = localStorage.getItem('echelon_public_icon');
       if (stored) {
-        return JSON.parse(stored);
+        return stored as any;
       }
     } catch (e) {}
-    return {
-      outerIcon: 'stealth-matte-gold',
-      innerIcon: 'regal-obsidian-gold',
-    };
+    return 'stealth-matte-gold';
   });
 
   // Bottom Navigation state
@@ -161,11 +153,10 @@ export default function App() {
           setActivePin(pin);
           setIsLocked(false);
           
-          // Sync public icons unencrypted so they appear on Login Screen instantly
-          const outerIcon = parsedData.outerIcon || 'stealth-matte-gold';
-          const innerIcon = parsedData.innerIcon || 'regal-obsidian-gold';
-          localStorage.setItem('echelon_public_icons', JSON.stringify({ outerIcon, innerIcon }));
-          setPublicIcons({ outerIcon, innerIcon });
+          // Sync public icon unencrypted so they appear on Login Screen instantly
+          const icon = parsedData.selectedGalleryIcon || 'stealth-matte-gold';
+          localStorage.setItem('echelon_public_icon', icon);
+          setPublicIcon(icon);
           return true;
         } catch (e) {
           console.error('Decrypted payload is corrupted:', e);
@@ -219,11 +210,10 @@ export default function App() {
     localStorage.setItem('echelon_vault_encrypted', payload);
     setVaultData(updatedState);
 
-    // Sync public icons unencrypted so they appear on Login Screen instantly
-    const outerIcon = updatedState.outerIcon || 'stealth-matte-gold';
-    const innerIcon = updatedState.innerIcon || 'regal-obsidian-gold';
-    localStorage.setItem('echelon_public_icons', JSON.stringify({ outerIcon, innerIcon }));
-    setPublicIcons({ outerIcon, innerIcon });
+    // Sync public icon unencrypted so they appear on Login Screen instantly
+    const icon = updatedState.selectedGalleryIcon || 'stealth-matte-gold';
+    localStorage.setItem('echelon_public_icon', icon);
+    setPublicIcon(icon);
   };
 
   // Centralized State Modifier with Automatic Undo capability
@@ -613,8 +603,7 @@ export default function App() {
         pinHash={pinHash}
         onUnlock={handleUnlockAndDecrypt}
         onSetPin={handleSetupNewPIN}
-        outerIcon={publicIcons.outerIcon}
-        innerIcon={publicIcons.innerIcon}
+        selectedGalleryIcon={publicIcon}
       />
     );
   }
@@ -663,7 +652,7 @@ export default function App() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 bg-[#141517] rounded-xl flex items-center justify-center border border-stone-800 shadow-md p-1 shrink-0">
-              <EchelonIcon name={vaultData.innerIcon || 'regal-obsidian-gold'} size="100%" />
+              <EchelonIcon name={vaultData.selectedGalleryIcon || 'stealth-matte-gold'} size="100%" />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight font-display text-white flex items-center flex-wrap">
@@ -1016,68 +1005,27 @@ export default function App() {
                 {/* SECTION: PREMIUM CUSTOM IDENTITY LAUNCHER & INTERIOR ICONS */}
                 <div id="premium-echelon-identity-settings" className="space-y-4 pt-4 border-t border-stone-850/40">
                   <div>
-                    <span className="text-xs font-bold text-stone-200 block">Echelon Custom Icon & Display Settings</span>
-                    <p className="text-[10px] text-stone-500 mt-0.5">Customize your outer face presentation (such as the launcher preview on the security gate) and inner system identity (rendered in your active workspace header).</p>
+                    <span className="text-xs font-bold text-stone-200 block">Echelon Corporate Icon & Brand Settings</span>
+                    <p className="text-[10px] text-stone-500 mt-0.5">Select a unified brand icon. This updates Echelon's signature styling globally: on the lock passcode gate, the dashboard workspace, system headers, and exported PDF/HTML reports.</p>
                   </div>
 
-                  {/* 1. Outer Identity Icon */}
                   <div className="space-y-2">
-                    <span className="text-[10px] uppercase font-bold text-stone-400 font-mono block">Outer Visibility Launcher Icon (Security Gate Face)</span>
+                    <span className="text-[10px] uppercase font-bold text-stone-400 font-mono block">Unified System-Wide Brand Icon</span>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
                         { key: 'stealth-matte-gold', label: 'Stealth Matte Gold', desc: 'Tactical dark titanium circular luxury shield' },
                         { key: 'vanguard-black-steel', label: 'Vanguard Black Steel', desc: 'Sleek matte watch casing with ruby hour jewels' },
                         { key: 'regal-obsidian-gold', label: 'Regal Royal Gold', desc: 'Polished gold obsidian tourbillon crown with diamonds' },
                       ].map((item) => {
-                        const isSelected = (vaultData.outerIcon || 'stealth-matte-gold') === item.key;
+                        const isSelected = (vaultData.selectedGalleryIcon || 'stealth-matte-gold') === item.key;
                         return (
                           <button
-                            key={`outer-${item.key}`}
+                            key={`brand-${item.key}`}
                             type="button"
                             onClick={() => {
-                              mutateVaultData(`Changed Outer Lock-screen Identity Icon`, (prev) => ({
+                              mutateVaultData(`Changed Unified System Brand Icon`, (prev) => ({
                                 ...prev,
-                                outerIcon: item.key as any
-                              }));
-                            }}
-                            className={`p-3 rounded-2xl text-left border transition-all flex items-center gap-3 ${
-                              isSelected ? 'border-amber-500 bg-amber-500/5' : 'border-stone-850 hover:bg-stone-500/5 bg-transparent'
-                            }`}
-                          >
-                            <div className="h-10 w-10 shrink-0 bg-[#141517] rounded-xl border border-stone-800 p-1 flex items-center justify-center shadow">
-                              <EchelonIcon name={item.key} size="100%" />
-                            </div>
-                            <div className="space-y-0.5 min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1 w-full">
-                                <span className="font-bold text-[11px] text-white truncate">{item.label}</span>
-                                <div className={`h-2.5 w-2.5 rounded-full border shrink-0 ${isSelected ? 'bg-amber-500 border-amber-500' : 'bg-transparent border-stone-700'}`} />
-                              </div>
-                              <p className="text-[8px] text-stone-500 leading-tight line-clamp-1">{item.desc}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 2. Inner Identity Icon */}
-                  <div className="space-y-2 pt-2">
-                    <span className="text-[10px] uppercase font-bold text-stone-400 font-mono block">Inner Dashboard Icon (Top Workspace Header)</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        { key: 'stealth-matte-gold', label: 'Stealth Matte Gold', desc: 'Tactical dark titanium circular luxury shield' },
-                        { key: 'vanguard-black-steel', label: 'Vanguard Black Steel', desc: 'Sleek matte watch casing with ruby hour jewels' },
-                        { key: 'regal-obsidian-gold', label: 'Regal Royal Gold', desc: 'Polished gold obsidian tourbillon crown with diamonds' },
-                      ].map((item) => {
-                        const isSelected = (vaultData.innerIcon || 'regal-obsidian-gold') === item.key;
-                        return (
-                          <button
-                            key={`inner-${item.key}`}
-                            type="button"
-                            onClick={() => {
-                              mutateVaultData(`Changed Inner Dashboard Workspace Icon`, (prev) => ({
-                                ...prev,
-                                innerIcon: item.key as any
+                                selectedGalleryIcon: item.key as any
                               }));
                             }}
                             className={`p-3 rounded-2xl text-left border transition-all flex items-center gap-3 ${

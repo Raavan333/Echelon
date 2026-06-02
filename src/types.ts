@@ -118,9 +118,7 @@ export interface EchelonState {
   archivedReportMonths: string[]; // Keep track of archived months (YYYY-MM)
   budgetCategoryLimits?: BudgetCategoryLimit[];
   customFields?: CustomField[];
-  selectedGalleryIcon?: 'gold-shield' | 'watch-chrono' | 'stealth-carbon';
-  outerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
-  innerIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
+  selectedGalleryIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
   userName?: string; // Customizable name for user profile reports
   customThemeConfigs?: CustomThemeConfig[]; // User's self-configured themes
   activeAccentColor?: string; // Overriding color for amber-500

@@ -1,0 +1,8 @@
+{
+  "appId": "com.buildquietwealth.echelon",
+  "appName": "Echelon",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
