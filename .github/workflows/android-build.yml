@@ -43,10 +43,11 @@ jobs:
 
       - name: Repair and Refresh Gradle Wrapper
         run: |
-          # Download a clean, authentic gradle-wrapper.jar to bypass any corruption/Git LFS issues
-          curl -sL https://github.com/gradle/gradle/raw/main/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          cd android
+          # Natively regenerate the Gradle wrapper with the correct version to prevent any corruption
+          gradle wrapper --gradle-version 8.14.3
           # Clean any Windows-style carriage returns from the gradlew script
-          sed -i -e 's/\r$//' android/gradlew
+          sed -i -e 's/\r$//' gradlew
 
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
