@@ -604,6 +604,13 @@ export default function App() {
         onUnlock={handleUnlockAndDecrypt}
         onSetPin={handleSetupNewPIN}
         selectedGalleryIcon={publicIcon}
+        onResetApp={() => {
+          localStorage.clear();
+          setPinHash('');
+          setVaultData(null);
+          setIsLocked(true);
+          setActivePin('');
+        }}
       />
     );
   }
