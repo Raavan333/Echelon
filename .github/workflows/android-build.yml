@@ -41,6 +41,13 @@ jobs:
       - name: Sync Web assets with Android Project
         run: npx cap sync
 
+      - name: Repair and Refresh Gradle Wrapper
+        run: |
+          # Download a clean, authentic gradle-wrapper.jar to bypass any corruption/Git LFS issues
+          curl -sL https://github.com/gradle/gradle/raw/main/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          # Clean any Windows-style carriage returns from the gradlew script
+          sed -i -e 's/\r$//' android/gradlew
+
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 

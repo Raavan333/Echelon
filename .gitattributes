@@ -1,0 +1,10 @@
+# Ensure Gradle wrapper shell script uses LF line endings
+android/gradlew text eol=lf
+
+# Ensure JAR files are treated as binary to prevent corruption
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
