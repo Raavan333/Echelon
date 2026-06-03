@@ -42,6 +42,10 @@ export interface Asset {
   lastUpdated: string;
   startDate?: string;
   endDate?: string;
+  sweepInEnabled?: boolean;
+  sweepInLinkedAssetId?: string; // Linked bank balance Asset ID
+  maturityPenaltyRate?: number; // Break penalty percentage, e.g. 1%
+  isMatured?: boolean;
 }
 
 export interface Loan {
@@ -64,6 +68,7 @@ export interface FinancialGoal {
   targetAmount: number;
   deadlineDate: string; // ISO date
   category: string;
+  assetIds?: string[];
 }
 
 export interface Budget {
@@ -84,7 +89,7 @@ export interface Expense {
 
 export interface EchelonTheme {
   mode: 'dark' | 'light';
-  palette: 'black' | 'silver' | 'blue' | 'elegant-dark';
+  palette: 'stealth-gold' | 'black-steel' | 'royal-emerald' | 'rose-amethyst' | 'platinum-silver' | 'slate-amber' | 'black' | 'silver' | 'blue' | 'elegant-dark' | string;
 }
 
 export interface BudgetCategoryLimit {
@@ -102,6 +107,43 @@ export interface CustomThemeConfig {
   name: string;
   primaryColor: string; // Custom Hex accent color code
   bgMode: 'dark' | 'light';
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  totalLimit: number;
+  usedBalance: number;
+  apr: number; // Annual % rate, charges on overdue balance
+  statementDate: number; // Day of month (e.g. 5)
+  bufferDays: number; // Days to pay after statement generated (e.g. 20)
+  lastBillAmount?: number; // Last statement generated amount
+  dueDate?: string; // Calculated absolute ISO due date
+  lastStatementDate?: string; // Last statement date
+  outstandingBalanceAtStatement?: number; // Outstanding statement amount
+  alertRemainingLimit?: number; // alert threshold
+  alertUsedLimitPct?: number; // alert threshold percent
+}
+
+export interface OutflowLog {
+  id: string;
+  amount: number;
+  category: string;
+  date: string; // ISO Date string
+  sourceType: 'bank_balance' | 'credit_card';
+  sourceId: string; // Asset ID or CreditCard ID
+  sourceName: string;
+  amountLeftAfter: number; // Balance left in bank or CC remaining limit
+  notes?: string;
+  fdSweepBrokenId?: string; // Broken FD ID
+  fdSweepPenaltyFee?: number; // penalty fee if bank was broken
+}
+
+export interface AcknowledgedAlertRecord {
+  id: string;
+  ruleName: string;
+  message: string;
+  date: string; // ISO date of ack
 }
 
 export interface EchelonState {
@@ -126,4 +168,22 @@ export interface EchelonState {
   customSavingsGoalAmt?: number; // Custom user desired savings override
   userOverriddenExpenses?: number; // Custom decisive monthly expense flow rate
   customAlertRules?: string[]; // Custom defined threshold rules or alerting limits
+  structuredAlertRules?: AlertRule[]; // Structured rule alerts
+  creditCards?: CreditCard[];
+  outflows?: OutflowLog[];
+  acknowledgedAlerts?: AcknowledgedAlertRecord[];
+  selectedFontOption?: 'classic-inter' | 'cyber-mono' | 'serif-editorial';
+  selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
+  slideshowEnabled?: boolean;
+  slideshowIntervalSeconds?: number;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  assetIds: string[]; // Select multiple or single funds
+  targetAmount?: number; // threshold amount
+  targetPercent?: number; // threshold percentage of net worth or original
+  conditionType: 'below_amount' | 'above_amount' | 'below_percent' | 'above_percent';
+  isActive: boolean;
 }

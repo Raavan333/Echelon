@@ -39,7 +39,11 @@ import {
   CompoundingFrequency,
   EchelonTheme,
   BudgetCategoryLimit,
-  CustomField
+  CustomField,
+  AlertRule,
+  CreditCard,
+  OutflowLog,
+  AcknowledgedAlertRecord
 } from './types';
 
 // Child components
@@ -56,7 +60,7 @@ import GoalMilestones from './components/GoalMilestones';
 // Utilities
 import { encryptData, decryptData, hashPin } from './utils/security';
 import { getColorTokens } from './utils/theme';
-import { calculateLoanCurrentBalance, calculateWealthRates } from './utils/math';
+import { calculateLoanCurrentBalance, calculateWealthRates, calculateCreditCardEffectiveLiability } from './utils/math';
 import { generateCSVData, generateHTMLReport, downloadBlob } from './utils/export';
 
 // Default initial state for a fresh setup
@@ -84,6 +88,11 @@ const createInitialState = (): EchelonState => ({
   budgetCategoryLimits: [],
   customFields: [],
   selectedGalleryIcon: 'stealth-matte-gold',
+  creditCards: [],
+  outflows: [],
+  acknowledgedAlerts: [],
+  selectedFontOption: 'classic-inter',
+  selectedProgressBarStyle: 'ultra-thin',
 });
 
 export default function App() {
@@ -118,6 +127,12 @@ export default function App() {
   const [newThemeColor, setNewThemeColor] = useState<string>('#f59e0b');
   const [newThemeBgMode, setNewThemeBgMode] = useState<'dark' | 'light'>('dark');
 
+  // Interactive Alert Builder state
+  const [newAlertName, setNewAlertName] = useState<string>('');
+  const [newAlertAssetIds, setNewAlertAssetIds] = useState<string[]>([]);
+  const [newAlertConditionType, setNewAlertConditionType] = useState<'below_amount' | 'above_amount' | 'below_percent' | 'above_percent'>('below_amount');
+  const [newAlertThresholdValue, setNewAlertThresholdValue] = useState<string>('');
+
   // Undo System states
   const [undoStack, setUndoStack] = useState<EchelonState[]>([]);
   const [lastActionMessage, setLastActionMessage] = useState<string>('');
@@ -139,6 +154,127 @@ export default function App() {
       document.body.className = 'bg-zinc-950';
     }
   }, [vaultData]);
+
+  // Sync dynamic brand icon choices to browser favicon & smartphone PWA home screen touch-icon
+  useEffect(() => {
+    const iconKey = vaultData?.selectedGalleryIcon || publicIcon || 'stealth-matte-gold';
+    
+    let svgStr = '';
+    if (iconKey === 'vanguard-black-steel') {
+      svgStr = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#111215" stroke="#090a0c" stroke-width="2.5" /><circle cx="50" cy="50" r="41" fill="#0b0c0d" stroke="#1c1e22" stroke-width="1" /><polygon points="50,22 74,36 74,64 50,78 26,64 26,36" fill="#151618" stroke="#4a4f5d" stroke-width="1.5" /><circle cx="50" cy="8" r="2.5" fill="#f25c54" /></svg>`;
+    } else if (iconKey === 'regal-obsidian-gold') {
+      svgStr = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#050505" stroke="#d4af37" stroke-width="2.5" /><polygon points="50,20 76,35 76,65 50,80 24,65 24,35" fill="#0c0c0e" stroke="#d4af37" stroke-width="1.5" /><circle cx="50" cy="50" r="12" fill="#d4af37" /></svg>`;
+    } else {
+      // stealth-matte-gold (default)
+      svgStr = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0f1011" stroke="#1c1d1e" stroke-width="2.5" /><polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="#141517" stroke="#d4af37" stroke-width="1.5" /><path d="M32,64 L65,34 M65,34 L54,33 M65,34 L66,45" stroke="#ffeaa7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
+    }
+
+    const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgStr);
+
+    // Dynamic browser tab favicon sync
+    let linkFav: any = document.querySelector("link[rel*='icon']");
+    if (!linkFav) {
+      linkFav = document.createElement('link');
+      linkFav.rel = 'icon';
+      document.head.appendChild(linkFav);
+    }
+    linkFav.type = 'image/svg+xml';
+    linkFav.href = dataUrl;
+
+    // Dynamic iOS/Android Mobile Home Screen Shortcut App-Icon sync
+    let linkApple: any = document.querySelector("link[rel='apple-touch-icon']");
+    if (!linkApple) {
+      linkApple = document.createElement('link');
+      linkApple.rel = 'apple-touch-icon';
+      document.head.appendChild(linkApple);
+    }
+    linkApple.href = dataUrl;
+
+    document.title = "Echelon Vault | Quiet Wealth Ledger";
+  }, [vaultData?.selectedGalleryIcon, publicIcon]);
+
+  // Atomic dual-timer security lockout: 15s UI idle, 10s tab background
+  useEffect(() => {
+    if (isLocked) return;
+
+    let idleTimer: ReturnType<typeof setTimeout>;
+    let backgroundTime: number | null = null;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setIsLocked(true);
+        setActivePin(''); // Flush sensitive in-memory key state on lockout
+      }, 15000); // 15s active idle timeout
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        backgroundTime = Date.now();
+      } else if (backgroundTime !== null) {
+        const elapsed = (Date.now() - backgroundTime) / 1000;
+        if (elapsed >= 10) {
+          setIsLocked(true);
+          setActivePin(''); // Lock out if backgrounded >= 10 seconds
+        }
+        backgroundTime = null;
+      }
+    };
+
+    // Capture user sensory inputs
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('mousedown', resetIdleTimer);
+    window.addEventListener('keypress', resetIdleTimer);
+    window.addEventListener('touchstart', resetIdleTimer);
+    window.addEventListener('scroll', resetIdleTimer);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Bootstrap first monitoring window
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('mousedown', resetIdleTimer);
+      window.removeEventListener('keypress', resetIdleTimer);
+      window.removeEventListener('touchstart', resetIdleTimer);
+      window.removeEventListener('scroll', resetIdleTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isLocked]);
+
+  // Theme auto-rotate slideshow effect
+  useEffect(() => {
+    if (!vaultData || !vaultData.slideshowEnabled || isLocked) return;
+
+    const intervalSec = vaultData.slideshowIntervalSeconds || 10;
+    const masterpiecePalettes = [
+      'stealth-gold',
+      'black-steel',
+      'royal-emerald',
+      'rose-amethyst',
+      'platinum-silver',
+      'slate-amber',
+      'elegant-dark',
+      'black',
+      'silver',
+      'blue'
+    ];
+
+    const cycleTimer = setInterval(() => {
+      const currentPalette = vaultData.theme.palette;
+      const currentIdx = masterpiecePalettes.indexOf(currentPalette);
+      const nextIdx = (currentIdx + 1) % masterpiecePalettes.length;
+      const nextPalette = masterpiecePalettes[nextIdx];
+
+      handleChangeTheme({
+        mode: 'dark',
+        palette: nextPalette as any
+      });
+    }, intervalSec * 1000);
+
+    return () => clearInterval(cycleTimer);
+  }, [vaultData?.slideshowEnabled, vaultData?.slideshowIntervalSeconds, vaultData?.theme.palette, isLocked]);
 
   // Decryption callback handling from UI passcode dial
   const handleUnlockAndDecrypt = (pin: string): boolean => {
@@ -458,6 +594,267 @@ export default function App() {
     }));
   };
 
+  const handleUpdateUserOverriddenExpenses = (val: number | undefined) => {
+    mutateVaultData(`Adjusted decisive monthly overall sink`, (current) => ({
+      ...current,
+      userOverriddenExpenses: val,
+    }));
+  };
+
+  const handleUpdateCustomSavingsGoalAmt = (val: number) => {
+    mutateVaultData(`Updated Additional Buffer Spends limit`, (current) => ({
+      ...current,
+      customSavingsGoalAmt: val,
+    }));
+  };
+
+  // --- CREDIT CARD HANDLERS ---
+  const handleAddCreditCard = (cardData: Omit<CreditCard, 'id'>) => {
+    const newCard: CreditCard = {
+      ...cardData,
+      id: `cc-${Date.now()}`,
+    };
+    mutateVaultData(`Added Credit Card: ${cardData.name}`, (current) => ({
+      ...current,
+      creditCards: [...(current.creditCards || []), newCard],
+    }));
+  };
+
+  const handleRemoveCreditCard = (id: string) => {
+    mutateVaultData(`Removed Credit Card`, (current) => ({
+      ...current,
+      creditCards: (current.creditCards || []).filter(c => c.id !== id),
+    }));
+  };
+
+  const handleSimulateStatement = (cardId: string) => {
+    mutateVaultData(`Generated Statement for Credit Card`, (current) => {
+      const cards = [...(current.creditCards || [])];
+      const card = cards.find(c => c.id === cardId);
+      if (card) {
+        card.lastBillAmount = card.usedBalance;
+        card.outstandingBalanceAtStatement = card.usedBalance;
+        
+        // Calculate due date based on statement Date of current month + bufferDays
+        const now = new Date();
+        const statementDate = new Date(now.getFullYear(), now.getMonth(), card.statementDate);
+        const dueDate = new Date(statementDate.getTime() + card.bufferDays * 24 * 60 * 60 * 1000);
+        
+        card.dueDate = dueDate.toISOString().split('T')[0];
+        card.lastStatementDate = now.toISOString().split('T')[0];
+      }
+      return { ...current, creditCards: cards };
+    });
+  };
+
+  const handlePayCreditCardBill = (cardId: string, amount: number, bankAccountId: string) => {
+    mutateVaultData(`Paid Credit Card Bill`, (current) => {
+      const cards = [...(current.creditCards || [])];
+      const assets = [...current.assets];
+      const card = cards.find(c => c.id === cardId);
+      const bank = assets.find(b => b.id === bankAccountId);
+      
+      if (card && bank) {
+        // Deduct from bank balance
+        bank.currentValue = parseFloat((bank.currentValue - amount).toFixed(2));
+        
+        // Reduce card bill / usedBalance
+        card.usedBalance = parseFloat((Math.max(0, card.usedBalance - amount)).toFixed(2));
+        if (card.lastBillAmount) {
+          card.lastBillAmount = parseFloat((Math.max(0, card.lastBillAmount - amount)).toFixed(2));
+        }
+        
+        // Add to outflow logs
+        const newOutflowLog: OutflowLog = {
+          id: `of-ccpay-${Date.now()}`,
+          amount: amount,
+          category: 'Credit Card Bill Payment',
+          date: new Date().toISOString().split('T')[0],
+          sourceType: 'bank_balance',
+          sourceId: bankAccountId,
+          sourceName: bank.name,
+          amountLeftAfter: bank.currentValue,
+          notes: `Repaid Credit Card Bill of ${card.name} using ${bank.name}. Card current used balance: ${card.usedBalance}`,
+        };
+        
+        return {
+          ...current,
+          creditCards: cards,
+          assets: assets,
+          outflows: [newOutflowLog, ...(current.outflows || [])]
+        };
+      }
+      return current;
+    });
+  };
+
+  const handleUpdateCreditCardAlerts = (cardId: string, remainingLimitAlert?: number, usedLimitPctAlert?: number) => {
+    mutateVaultData(`Updated Credit Card Alerts`, (current) => {
+      const cards = [...(current.creditCards || [])];
+      const card = cards.find(c => c.id === cardId);
+      if (card) {
+        card.alertRemainingLimit = remainingLimitAlert && remainingLimitAlert > 0 ? remainingLimitAlert : undefined;
+        card.alertUsedLimitPct = usedLimitPctAlert && usedLimitPctAlert > 0 ? usedLimitPctAlert : undefined;
+      }
+      return { ...current, creditCards: cards };
+    });
+  };
+
+  // --- OUTFLOW LOGGING WITH SWEEP-IN FD INTEGRATION ---
+  const handleAddOutflow = (expenseData: Omit<Expense, 'id'>, source: { sourceType: 'bank_balance' | 'credit_card'; sourceId: string }) => {
+    const newExpense: Expense = {
+      ...expenseData,
+      id: `ex-${Date.now()}`,
+    };
+    
+    mutateVaultData(`Logged Outflow for ${expenseData.category}`, (current) => {
+      const updatedAssets = [...current.assets];
+      const updatedCards = [...(current.creditCards || [])];
+      const updatedOutflows = [...(current.outflows || [])];
+      
+      let finalNotes = expenseData.notes || '';
+      let remainderLeft = 0;
+      let sourceName = '';
+      let fdSweepBrokenId = '';
+      let fdSweepPenaltyFee = 0;
+      
+      if (source.sourceType === 'bank_balance') {
+        const bankAsset = updatedAssets.find(a => a.id === source.sourceId);
+        if (bankAsset) {
+          sourceName = bankAsset.name;
+          const diff = bankAsset.currentValue - expenseData.amount;
+          if (diff >= 0) {
+            bankAsset.currentValue = parseFloat(diff.toFixed(2));
+            remainderLeft = bankAsset.currentValue;
+          } else {
+            // Deficit! Let's check for linked sweep-in FDs
+            const linkedFD = updatedAssets.find(a => 
+              a.type === AssetType.FD && 
+              a.sweepInEnabled && 
+              a.sweepInLinkedAssetId === bankAsset.id && 
+              a.currentValue > 0
+            );
+            
+            if (linkedFD) {
+              const sweepNeeded = parseFloat(Math.abs(diff).toFixed(2));
+              fdSweepBrokenId = linkedFD.id;
+              if (linkedFD.currentValue >= sweepNeeded) {
+                linkedFD.currentValue = parseFloat((linkedFD.currentValue - sweepNeeded).toFixed(2));
+                bankAsset.currentValue = 0;
+                remainderLeft = 0;
+                finalNotes += ` (Sweep-in triggered from ${linkedFD.name}: ${current.currencySymbol || '₹'}${sweepNeeded} swept)`;
+              } else {
+                const drawn = linkedFD.currentValue;
+                linkedFD.currentValue = 0;
+                bankAsset.currentValue = 0;
+                remainderLeft = 0;
+                finalNotes += ` (Partial Sweep-in triggered from ${linkedFD.name}: ${current.currencySymbol || '₹'}${drawn} swept)`;
+              }
+            } else {
+              // No sweep-in FD found. Let's just deduct and allow overdraft
+              bankAsset.currentValue = parseFloat(diff.toFixed(2));
+              remainderLeft = bankAsset.currentValue;
+            }
+          }
+        }
+      } else if (source.sourceType === 'credit_card') {
+        const card = updatedCards.find(c => c.id === source.sourceId);
+        if (card) {
+          sourceName = card.name;
+          card.usedBalance = parseFloat((card.usedBalance + expenseData.amount).toFixed(2));
+          remainderLeft = Math.max(0, parseFloat((card.totalLimit - card.usedBalance).toFixed(2)));
+        }
+      }
+      
+      const newOutflowLog: OutflowLog = {
+        id: `of-${Date.now()}`,
+        amount: expenseData.amount,
+        category: expenseData.category,
+        date: expenseData.date,
+        sourceType: source.sourceType,
+        sourceId: source.sourceId,
+        sourceName,
+        amountLeftAfter: remainderLeft,
+        notes: finalNotes,
+        fdSweepBrokenId,
+        fdSweepPenaltyFee,
+      };
+      
+      return {
+        ...current,
+        expenses: [...current.expenses, newExpense],
+        assets: updatedAssets,
+        creditCards: updatedCards,
+        outflows: [newOutflowLog, ...updatedOutflows],
+      };
+    });
+  };
+
+  const handleLiquidateAssetPrematurely = (assetId: string, targetBankAccountId: string) => {
+    mutateVaultData(`Liquidated Asset Prematurely`, (current) => {
+      const updatedAssets = [...current.assets];
+      const assetIndex = updatedAssets.findIndex(a => a.id === assetId);
+      if (assetIndex === -1) return current;
+      
+      const asset = updatedAssets[assetIndex];
+      const targetBank = updatedAssets.find(b => b.id === targetBankAccountId);
+      
+      if (!targetBank) return current;
+      
+      let penaltyAmount = 0;
+      let netProceeds = asset.currentValue;
+      
+      if (asset.type === AssetType.FD || asset.type === AssetType.BOND) {
+        if (!asset.sweepInEnabled) {
+          const rate = asset.maturityPenaltyRate || 1; 
+          penaltyAmount = parseFloat((asset.currentValue * (rate / 100)).toFixed(2));
+          netProceeds = parseFloat((asset.currentValue - penaltyAmount).toFixed(2));
+        }
+      }
+      
+      targetBank.currentValue = parseFloat((targetBank.currentValue + netProceeds).toFixed(2));
+      asset.currentValue = 0;
+      asset.isMatured = true;
+      
+      const newOutflowLog: OutflowLog = {
+        id: `of-liq-${Date.now()}`,
+        amount: -netProceeds, 
+        category: 'Asset Liquidation',
+        date: new Date().toISOString().split('T')[0],
+        sourceType: 'bank_balance',
+        sourceId: targetBankAccountId,
+        sourceName: targetBank.name,
+        amountLeftAfter: targetBank.currentValue,
+        notes: `Liquidated early: ${asset.name}. Net proceeds ${current.currencySymbol || '₹'}${netProceeds} transferred. Penalty levied: ${current.currencySymbol || '₹'}${penaltyAmount}`,
+      };
+      
+      return {
+        ...current,
+        assets: updatedAssets,
+        outflows: [newOutflowLog, ...(current.outflows || [])]
+      };
+    });
+  };
+
+  const handleAcknowledgeAlert = (ruleId: string, ruleName: string, triggerMessage: string) => {
+    mutateVaultData(`Acknowledged Alert: ${ruleName}`, (current) => {
+      const updatedRules = (current.structuredAlertRules || []).filter(r => r.id !== ruleId);
+      
+      const newAck: AcknowledgedAlertRecord = {
+        id: `ack-${Date.now()}`,
+        ruleName,
+        message: triggerMessage,
+        date: new Date().toISOString(),
+      };
+      
+      return {
+        ...current,
+        structuredAlertRules: updatedRules,
+        acknowledgedAlerts: [newAck, ...(current.acknowledgedAlerts || [])],
+      };
+    });
+  };
+
   const handleChangeTheme = (theme: EchelonTheme) => {
     if (!vaultData) return;
     const nextState: EchelonState = {
@@ -525,6 +922,14 @@ export default function App() {
     });
   };
 
+  const handleUpdateStructuredAlertRules = (rules: AlertRule[]) => {
+    if (!vaultData) return;
+    saveVaultData({
+      ...vaultData,
+      structuredAlertRules: rules,
+    });
+  };
+
   const handleAddCustomTheme = (name: string, color: string, bgMode: 'dark' | 'light') => {
     if (!vaultData) return;
     const currentThemes = vaultData.customThemeConfigs || [];
@@ -564,6 +969,15 @@ export default function App() {
       ...vaultData,
       theme: nextTheme,
       customThemeConfigs: updatedThemes,
+    });
+  };
+
+  const handleToggleThemeSlideshow = (enabled: boolean, interval: number) => {
+    if (!vaultData) return;
+    saveVaultData({
+      ...vaultData,
+      slideshowEnabled: enabled,
+      slideshowIntervalSeconds: interval,
     });
   };
 
@@ -627,13 +1041,85 @@ export default function App() {
     .filter(l => l.type === LoanType.BORROWED)
     .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
   
-  const totalNetWorth = totalAssetsVal + totalLentVal - totalBorrowedVal;
-  const rates = calculateWealthRates(vaultData.assets, vaultData.loans, vaultData.monthlyEarnings, vaultData.expenses, totalNetWorth);
+  const totalCreditCardLiabilitiesVal = (vaultData.creditCards || [])
+    .reduce((sum, c) => sum + calculateCreditCardEffectiveLiability(c), 0);
+  
+  const totalNetWorth = totalAssetsVal + totalLentVal - totalBorrowedVal - totalCreditCardLiabilitiesVal;
+  const rates = calculateWealthRates(
+    vaultData.assets,
+    vaultData.loans,
+    vaultData.monthlyEarnings,
+    vaultData.expenses,
+    totalNetWorth,
+    vaultData.userOverriddenExpenses,
+    vaultData.customSavingsGoalAmt,
+    vaultData.budget.amount
+  );
 
   const activeColor = vaultData.activeAccentColor || '#f59e0b';
 
+  const getTriggeredAlerts = () => {
+    if (!vaultData || !vaultData.structuredAlertRules) return [];
+    
+    const triggered: { rule: AlertRule; message: string; severity: 'warning' | 'info' }[] = [];
+    const netWorthSum = totalNetWorth;
+    
+    vaultData.structuredAlertRules.forEach(rule => {
+      if (!rule.isActive) return;
+      
+      const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
+      if (selectedAssets.length === 0 && rule.assetIds && rule.assetIds.length > 0) return;
+      
+      const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+      const namesJoined = selectedAssets.map(a => a.name).join(', ') || 'selected funds';
+      
+      const thresholdAmt = rule.targetAmount || 0;
+      const thresholdPct = rule.targetPercent || 0;
+      
+      if (rule.conditionType === 'below_amount') {
+        if (combinedValue < thresholdAmt) {
+          triggered.push({
+            rule,
+            message: `📉 [${namesJoined}] Combined value (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) fell below minimum alert threshold (${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()})`,
+            severity: 'warning'
+          });
+        }
+      } else if (rule.conditionType === 'above_amount') {
+        if (combinedValue > thresholdAmt) {
+          triggered.push({
+            rule,
+            message: `📈 [${namesJoined}] Combined value (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) exceeded target alert threshold (${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()})`,
+            severity: 'info'
+          });
+        }
+      } else if (rule.conditionType === 'below_percent') {
+        const pctOfNetWorth = netWorthSum > 0 ? (combinedValue / netWorthSum) * 100 : 0;
+        if (pctOfNetWorth < thresholdPct) {
+          triggered.push({
+            rule,
+            message: `⚖️ [${namesJoined}] Allocation weight (${pctOfNetWorth.toFixed(1)}% of Net Worth) fell below alert threshold (${thresholdPct}%)`,
+            severity: 'warning'
+          });
+        }
+      } else if (rule.conditionType === 'above_percent') {
+        const pctOfNetWorth = netWorthSum > 0 ? (combinedValue / netWorthSum) * 100 : 0;
+        if (pctOfNetWorth > thresholdPct) {
+          triggered.push({
+            rule,
+            message: `🚨 [${namesJoined}] Allocation weight (${pctOfNetWorth.toFixed(1)}% of Net Worth) exceeded warning concentration ceiling (${thresholdPct}%)`,
+            severity: 'warning'
+          });
+        }
+      }
+    });
+    
+    return triggered;
+  };
+
+  const triggeredAlerts = getTriggeredAlerts();
+
   return (
-    <div className={`min-h-screen ${tokens.bg} pb-16 transition-colors duration-500 text-stone-100 relative`}>
+    <div className={`min-h-screen ${tokens.bg} pb-36 transition-colors duration-500 text-stone-100 relative`}>
       <style>{`
         .text-amber-500 { color: ${activeColor} !important; }
         .bg-amber-500 { background-color: ${activeColor} !important; }
@@ -682,25 +1168,19 @@ export default function App() {
               <span className="hidden md:inline">Settings</span>
             </button>
 
-            {/* Download dataset buttons */}
-            <button
-              type="button"
-              id="export-csv-top-btn"
-              onClick={handleExportCSV}
-              className={`p-2 rounded-xl border ${tokens.buttonBg} transition-all`}
-              title="Download CSV Audit"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-            </button>
-
+            {/* Save printable PDF button */}
             <button
               type="button"
               id="export-pdf-top-btn"
-              onClick={handleExportPDF}
-              className={`p-2 rounded-xl border ${tokens.buttonBg} transition-all`}
-              title="Save printable PDF"
+              onClick={() => {
+                setSettingsTab('backups');
+                setShowSettings(true);
+              }}
+              className={`p-2 rounded-xl border ${tokens.buttonBg} transition-all flex items-center gap-1.5`}
+              title="Navigate to Settings Downloads"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4 text-amber-500" />
+              <span className="hidden md:inline font-mono text-[11px] font-bold text-stone-300">Downloads</span>
             </button>
 
             {/* Lock button */}
@@ -721,8 +1201,32 @@ export default function App() {
       {/* MAIN WORKSPACE SECTION */}
       <main className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
         
+        {/* ACTIVE TRIGGERED SYSTEM ALERTS */}
+        {triggeredAlerts.length > 0 && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2 shadow-md">
+            <div className="flex items-center gap-2 pb-1.5 border-b border-rose-500/10">
+              <span className="inline-flex h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+              <span className="text-[10.5px] uppercase font-black text-rose-400 tracking-wider font-mono">⚠️ Echelon Safeguard Alerts Active ({triggeredAlerts.length})</span>
+            </div>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+              {triggeredAlerts.map((alertItem, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs font-mono text-stone-200">
+                  <span className="text-rose-500 font-bold shrink-0">•</span>
+                  <div className="flex-1">
+                    <span className="text-zinc-400 font-semibold inline-block mr-1">[{alertItem.rule.name}]:</span>
+                    <span className="text-stone-350">{alertItem.message}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-stone-500 font-mono text-right italic pt-1">
+              Configure alert limits and single/multiple fund anchors in Settings &gt; Goals, Sinks & Alerts
+            </p>
+          </div>
+        )}
+        
         {/* 2. DYNAMIC WORKSPACE PAGES */}
-        <div className="animate-fade-in pb-24">
+        <div className="animate-fade-in pb-36">
           
           {activeTab === 'portfolio' && (
             <div className="space-y-8">
@@ -748,12 +1252,19 @@ export default function App() {
                 currencySymbol={vaultData.currencySymbol || '₹'}
                 customSavingsGoalAmt={vaultData.customSavingsGoalAmt || 0}
                 userOverriddenExpenses={vaultData.userOverriddenExpenses}
-                onOpenSettings={() => setShowSettings(true)}
+                onUpdateUserOverriddenExpenses={handleUpdateUserOverriddenExpenses}
+                onUpdateCustomSavingsGoalAmt={handleUpdateCustomSavingsGoalAmt}
+                onOpenSettings={(tabName) => {
+                  setSettingsTab(tabName || 'rules');
+                  setShowSettings(true);
+                }}
+                budgetAmount={vaultData.budget.amount}
               />
 
               <GoalMilestones
                 theme={vaultData.theme}
                 goals={vaultData.goals}
+                assets={vaultData.assets}
                 totalPortfolioValue={totalNetWorth}
                 netYearlyFlow={rates.netPerYear}
                 onAddGoal={handleAddGoal}
@@ -787,6 +1298,15 @@ export default function App() {
               onRemoveLoan={handleRemoveLoan}
               currencySymbol={vaultData.currencySymbol || '₹'}
               onOpenSettings={() => setShowSettings(true)}
+              creditCards={vaultData.creditCards || []}
+              assets={vaultData.assets}
+              onAddCreditCard={handleAddCreditCard}
+              onRemoveCreditCard={handleRemoveCreditCard}
+              onSimulateStatement={handleSimulateStatement}
+              onPayCreditCardBill={handlePayCreditCardBill}
+              onUpdateCreditCardAlerts={handleUpdateCreditCardAlerts}
+              selectedProgressBarStyle={vaultData.selectedProgressBarStyle || 'ultra-thin'}
+              activeAccentColor={vaultData.activeAccentColor}
             />
           )}
 
@@ -816,6 +1336,7 @@ export default function App() {
               monthlyEarnings={vaultData.monthlyEarnings}
               expenses={vaultData.expenses}
               currencySymbol={vaultData.currencySymbol || '₹'}
+              goals={vaultData.goals}
             />
           )}
 
@@ -1119,12 +1640,18 @@ export default function App() {
                 {/* 1. Predefined Metallics Selection */}
                 <div>
                   <span className="text-xs font-bold text-stone-300 block mb-2">Predefined Premium Themes (Echelon Originals)</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {[
-                      { palette: 'elegant-dark', label: 'Platinum Dark', bg: 'bg-zinc-900 border-stone-800' },
+                      { palette: 'elegant-dark', label: 'Platinum Dark', bg: 'bg-zinc-900 border-zinc-800' },
                       { palette: 'black', label: 'Charcoal Gold', bg: 'bg-black border-amber-500/20' },
                       { palette: 'silver', label: 'Swiss Silver', bg: 'bg-slate-900 border-blue-500/20' },
-                      { palette: 'blue', label: 'Midnight Teal', bg: 'bg-[#0f172a] border-teal-500/20' }
+                      { palette: 'blue', label: 'Midnight Teal', bg: 'bg-[#0f172a] border-teal-500/20' },
+                      { palette: 'stealth-gold', label: 'Stealth Gold', bg: 'bg-[#111115] border-amber-500/20' },
+                      { palette: 'black-steel', label: 'Black Steel', bg: 'bg-[#0e0f11] border-zinc-700' },
+                      { palette: 'royal-emerald', label: 'Royal Emerald', bg: 'bg-[#03160a] border-emerald-500/20' },
+                      { palette: 'rose-amethyst', label: 'Rose Amethyst', bg: 'bg-[#0d091a] border-purple-500/20' },
+                      { palette: 'platinum-silver', label: 'Valkyrie Plat', bg: 'bg-[#111317] border-cyan-500/20' },
+                      { palette: 'slate-amber', label: 'Chronos Amber', bg: 'bg-[#101318] border-orange-500/25' }
                     ].map((p) => {
                       const isSel = vaultData.theme.palette === p.palette;
                       return (
@@ -1141,6 +1668,44 @@ export default function App() {
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Masterpiece Slideshow Mode controls */}
+                <div className="bg-stone-500/5 p-4 rounded-xl border border-stone-850/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-stone-300 block">Atmosphere Slideshow Mode</span>
+                      <p className="text-[10px] text-stone-500 mt-0.5">Automatically cycle between the 10 Echelon Originals over customizable timeslots</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="theme-slideshow-toggle"
+                        checked={vaultData.slideshowEnabled || false} 
+                        onChange={(e) => handleToggleThemeSlideshow(e.target.checked, vaultData.slideshowIntervalSeconds || 10)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-9 h-5 bg-stone-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
+
+                  {vaultData.slideshowEnabled && (
+                    <div className="flex items-center gap-3 animate-fade-in pt-1">
+                      <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Cycle Interval:</span>
+                      <select
+                        id="theme-slideshow-interval"
+                        value={vaultData.slideshowIntervalSeconds || 10}
+                        onChange={(e) => handleToggleThemeSlideshow(true, parseInt(e.target.value) || 10)}
+                        className="bg-stone-950 border border-stone-800 rounded px-2 py-1 text-xs text-white font-mono"
+                      >
+                        <option value="5">5 Seconds (Testing)</option>
+                        <option value="10">10 Seconds</option>
+                        <option value="30">30 Seconds</option>
+                        <option value="60">1 Minute</option>
+                        <option value="300">5 Minutes</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Custom Hex Active Accent selection */}
@@ -1421,48 +1986,209 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 4. Threshold custom rules creation */}
-                <div className="p-4 rounded-xl border border-stone-850/50 space-y-3">
-                  <span className="text-xs font-bold text-stone-300 block">Custom Notification Alerts & Warning Threshold limits</span>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      id="custom-threshold-alert-input"
-                      placeholder="e.g. Alert if Dining spends cross 1000 INR"
-                      className="flex-1 px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-white rounded-lg outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const inputEl = document.getElementById('custom-threshold-alert-input') as HTMLInputElement;
-                        if (inputEl && inputEl.value) {
-                          const currentRules = vaultData.customAlertRules || [];
-                          handleUpdateCustomAlertRules([...currentRules, inputEl.value]);
-                          inputEl.value = '';
-                        }
-                      }}
-                      className="px-3 bg-amber-500 text-zinc-950 font-bold text-xs rounded-lg hover:bg-amber-400 shrink-0"
-                    >
-                      Add Rule
-                    </button>
+                {/* 4. Interactive Guardrail Alerts builder */}
+                <div className="p-4 rounded-xl border border-stone-850/50 space-y-4">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-stone-300 block">Sovereign Guardian Portfolio Alerts</span>
+                    <p className="text-[10px] text-stone-500 font-mono leading-relaxed">Configure precise multi-asset or single-asset alerts based on custom amounts or net worth percentage thresholds.</p>
                   </div>
-                  
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {(vaultData.customAlertRules || []).map((rule, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-zinc-950 p-2 rounded-lg text-xs text-stone-300 font-mono">
-                        <span>● {rule}</span>
+
+                  {/* Add Alert Rule Form */}
+                  <div className="p-3 bg-stone-950/60 border border-stone-850 rounded-xl space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-amber-500 font-mono block">Configure New Notification Safeguard</span>
+                    
+                    {/* Alert Name */}
+                    <div>
+                      <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Alert Rule Profile Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Fixed Deposit Threshold Safety"
+                        value={newAlertName}
+                        onChange={(e) => setNewAlertName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-800 text-xs text-white rounded-lg outline-none font-mono"
+                      />
+                    </div>
+
+                    {/* Choose Multiple or Single Funds */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block">Pick Support Anchors & Funds</label>
                         <button
                           type="button"
                           onClick={() => {
-                            const filtered = (vaultData.customAlertRules || []).filter((_, i) => i !== idx);
-                            handleUpdateCustomAlertRules(filtered);
+                            if (newAlertAssetIds.length === vaultData.assets.length) {
+                              setNewAlertAssetIds([]);
+                            } else {
+                              setNewAlertAssetIds(vaultData.assets.map(a => a.id));
+                            }
                           }}
-                          className="text-[9px] text-rose-500 hover:text-rose-400 uppercase font-bold ml-2 shrink-0"
+                          className="text-[9.5px] uppercase font-bold text-amber-500 hover:text-amber-400 font-mono"
                         >
-                          Delete
+                          {newAlertAssetIds.length === vaultData.assets.length ? 'Clear All' : 'Select All'}
                         </button>
                       </div>
-                    ))}
+
+                      {vaultData.assets.length === 0 ? (
+                        <p className="text-[10px] text-stone-500 font-mono italic">No assets registered yet. Add fields inside the Assets page.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-stone-900 rounded-lg border border-stone-800">
+                          {vaultData.assets.map(asset => {
+                            const isChecked = newAlertAssetIds.includes(asset.id);
+                            return (
+                              <label key={asset.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] text-stone-300">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setNewAlertAssetIds(newAlertAssetIds.filter(id => id !== asset.id));
+                                    } else {
+                                      setNewAlertAssetIds([...newAlertAssetIds, asset.id]);
+                                    }
+                                  }}
+                                  className="rounded border-stone-800 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-stone-950 h-3 w-3"
+                                />
+                                <span className="truncate font-mono" title={asset.name}>{asset.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Condition type & Threshold Box */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Condition Anchor Model</label>
+                        <select
+                          value={newAlertConditionType}
+                          onChange={(e: any) => setNewAlertConditionType(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-stone-900 border border-stone-800 text-xs text-stone-300 rounded-lg outline-none font-mono"
+                        >
+                          <option value="below_amount">Falls below Threshold Amount</option>
+                          <option value="above_amount">Crosses above Threshold Amount</option>
+                          <option value="below_percent">Sinks below % of Net Worth</option>
+                          <option value="above_percent">Exceeds % of Net Worth</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">
+                          {newAlertConditionType.includes('percent') ? 'Threshold Percentage (%)' : `Threshold Amount (${vaultData.currencySymbol || '₹'})`}
+                        </label>
+                        <input
+                          type="number"
+                          placeholder={newAlertConditionType.includes('percent') ? 'e.g. 20' : 'e.g. 50000'}
+                          value={newAlertThresholdValue}
+                          onChange={(e) => setNewAlertThresholdValue(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-stone-900 border border-stone-800 text-xs text-white rounded-lg outline-none font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Insert Action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newAlertName.trim()) {
+                          alert("Please specify a protective name profile for your alert.");
+                          return;
+                        }
+                        if (newAlertAssetIds.length === 0) {
+                          alert("Please select at least one single fund support anchor to associate.");
+                          return;
+                        }
+                        const valFloat = parseFloat(newAlertThresholdValue);
+                        if (isNaN(valFloat) || valFloat <= 0) {
+                          alert("Please enter a valid numeric threshold configuration.");
+                          return;
+                        }
+
+                        const newRule: AlertRule = {
+                          id: 'alert_' + Date.now(),
+                          name: newAlertName,
+                          assetIds: newAlertAssetIds,
+                          conditionType: newAlertConditionType,
+                          isActive: true,
+                          targetAmount: newAlertConditionType.includes('amount') ? valFloat : undefined,
+                          targetPercent: newAlertConditionType.includes('percent') ? valFloat : undefined,
+                        };
+
+                        const currentRules = vaultData.structuredAlertRules || [];
+                        handleUpdateStructuredAlertRules([...currentRules, newRule]);
+
+                        // Reset
+                        setNewAlertName('');
+                        setNewAlertAssetIds([]);
+                        setNewAlertThresholdValue('');
+                      }}
+                      className="w-full py-1.5 bg-amber-500 text-zinc-950 font-bold text-xs rounded-lg hover:bg-amber-400 transition-all font-mono uppercase"
+                    >
+                      Establish Guardrail Rule
+                    </button>
+                  </div>
+
+                  {/* Configured Rules Lists */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-stone-500 font-mono block">Active Security Guardrails Profile</span>
+                    
+                    {(!vaultData.structuredAlertRules || vaultData.structuredAlertRules.length === 0) ? (
+                      <p className="text-[10px] text-stone-400 font-mono italic">No custom protective rules established. Create one above!</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {vaultData.structuredAlertRules.map((rule) => {
+                          const associatedNames = vaultData.assets
+                            .filter(a => rule.assetIds.includes(a.id))
+                            .map(a => a.name)
+                            .join(', ') || 'No matching active assets';
+                          const conditionDesc = 
+                            rule.conditionType === 'below_amount' ? `Falls below ${vaultData.currencySymbol || '₹'}${rule.targetAmount?.toLocaleString()}` :
+                            rule.conditionType === 'above_amount' ? `Rises above ${vaultData.currencySymbol || '₹'}${rule.targetAmount?.toLocaleString()}` :
+                            rule.conditionType === 'below_percent' ? `Drops below ${rule.targetPercent}% of Net Worth` : 
+                            `Crosses above ${rule.targetPercent}% of Net Worth`;
+
+                          return (
+                            <div key={rule.id} className="p-2.5 bg-zinc-950/85 rounded-xl border border-stone-850 flex flex-col gap-1 text-[11px] hover:border-amber-500/10 transition-colors">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-stone-200 font-mono">⚡ {rule.name}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedRules = (vaultData.structuredAlertRules || []).map(r => 
+                                        r.id === rule.id ? { ...r, isActive: !r.isActive } : r
+                                      );
+                                      handleUpdateStructuredAlertRules(updatedRules);
+                                    }}
+                                    className={`px-1.5 py-0.5 text-[8.5px] font-mono rounded font-bold uppercase ${
+                                      rule.isActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-stone-800 text-stone-500'
+                                    }`}
+                                  >
+                                    {rule.isActive ? 'Active' : 'Muted'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const filtered = (vaultData.structuredAlertRules || []).filter(r => r.id !== rule.id);
+                                      handleUpdateStructuredAlertRules(filtered);
+                                    }}
+                                    className="text-[9px] text-rose-500 hover:text-rose-400 font-bold uppercase transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-stone-400 font-mono">
+                                <strong className="text-stone-500">Targeting:</strong> {associatedNames}
+                              </p>
+                              <p className="text-[10px] text-stone-350 font-mono">
+                                <strong className="text-stone-500">Condition:</strong> <span className="text-amber-400 font-semibold">{conditionDesc}</span>
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1524,24 +2250,38 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Backup / Export with zero-budget criteria */}
+                  {/* Backup & Reports Pack Export */}
                   <div className="p-4 rounded-xl bg-stone-950/40 border border-stone-850/60 flex flex-col justify-between">
                     <div>
-                      <span className="text-xs font-bold text-stone-300 block mb-1">Download Ledger Backup</span>
+                      <span className="text-xs font-bold text-amber-500 font-mono block mb-1">📊 Download Reports & Ledgers</span>
                       <p className="text-[10.5px] text-stone-500 leading-relaxed">
-                        Export your full secure Client-Side database containing assets logs, loans, and system goal tracks to keep your personal ledgers safe.
+                        Export your comprehensive quiet wealth reports, spreadsheets, and secure schema file to store your records locally.
                       </p>
                     </div>
-                    <div className="mt-4 flex flex-col gap-2">
+                    <div className="mt-4 space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleExportPDF}
+                        className="px-3 py-1.5 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs rounded-lg transition-all"
+                      >
+                        Download Printable Assessment Statement (HTML)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportCSV}
+                        className="px-3 py-1.5 w-full bg-zinc-800 hover:bg-zinc-750 text-stone-200 font-semibold text-xs rounded-lg border border-stone-750 transition-all"
+                      >
+                        Download Portfolio Statement (CSV)
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
                           const stateCopy = { ...vaultData };
                           downloadBlob(JSON.stringify(stateCopy, null, 2), 'Echelon_Protected_Manual_Restore.json', 'application/json');
                         }}
-                        className="px-3.5 py-1.5 w-full bg-zinc-800 hover:bg-zinc-750 text-amber-500 border border-stone-700 font-bold text-xs rounded-lg transition-all"
+                        className="px-3 py-1.5 w-full bg-zinc-850 hover:bg-zinc-805 text-stone-300 font-medium text-xs rounded-lg border border-stone-800 transition-all"
                       >
-                        Download Backup JSON File
+                        Download Backup JSON Database
                       </button>
                       <button
                         type="button"
@@ -1549,9 +2289,9 @@ export default function App() {
                           const stateStr = JSON.stringify(vaultData, null, 2);
                           handleCopyToClipboard(stateStr);
                         }}
-                        className="px-3.5 py-1.5 w-full bg-zinc-850 hover:bg-zinc-800 text-stone-300 text-xs font-semibold rounded-lg transition-all"
+                        className="px-3 py-1.5 w-full bg-zinc-900/60 hover:bg-zinc-850 text-stone-400 text-[10.5px] font-medium rounded-lg transition-all"
                       >
-                        Copy Raw JSON string
+                        Copy Raw JSON String
                       </button>
                     </div>
                   </div>

@@ -19,7 +19,7 @@ import {
   Gauge, 
   Coins 
 } from 'lucide-react';
-import { EchelonTheme, Asset, Loan, LoanType, Expense } from '../types';
+import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { calculateWealthRates } from '../utils/math';
 
@@ -30,6 +30,7 @@ interface AIInsightsProps {
   monthlyEarnings: number;
   expenses: Expense[];
   currencySymbol?: string;
+  goals?: FinancialGoal[];
 }
 
 export default function AIInsights({
@@ -39,11 +40,14 @@ export default function AIInsights({
   monthlyEarnings,
   expenses,
   currencySymbol = '₹',
+  goals = [],
 }: AIInsightsProps) {
   const [cloudInsights, setCloudInsights] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [score, setScore] = useState<number>(65);
+  const [simulatedRepay, setSimulatedRepay] = useState<boolean>(false);
+  const [simulatedDivert, setSimulatedDivert] = useState<boolean>(false);
 
   const tokens = getColorTokens(theme);
 
@@ -55,9 +59,6 @@ export default function AIInsights({
   const totalBorrowedVal = loans
     .filter(l => l.type === LoanType.BORROWED)
     .reduce((sum, l) => sum + (l.principal - l.manualPayments), 0);
-  const netWorth = totalAssetsVal + totalLentVal - totalBorrowedVal;
-
-  const rates = calculateWealthRates(assets, loans, monthlyEarnings, expenses, netWorth);
 
   // Dynamic Portfolio Blended Yield
   let totalYieldAmount = 0;
@@ -69,12 +70,24 @@ export default function AIInsights({
   });
   const blendedAPY = totalAssetsVal > 0 ? (totalYieldAmount / totalAssetsVal) * 100 : 0;
 
+  // Identify high interest rate debts
+  const highInterestDebts = loans.filter(l => l.type === LoanType.BORROWED && l.interestRate > blendedAPY);
+  const highInterestDebtValue = highInterestDebts.reduce((sum, l) => sum + (l.principal - l.manualPayments), 0);
+
+  // Simulated variable outputs
+  const displayBorrowedVal = simulatedRepay ? Math.max(0, totalBorrowedVal - highInterestDebtValue) : totalBorrowedVal;
+  const netWorth = totalAssetsVal + totalLentVal - displayBorrowedVal;
+
+  const rates = calculateWealthRates(assets, loans, monthlyEarnings, expenses, netWorth);
+
   // Emergency Shield (months of expenses covered by bank balance/liquid hold)
   const liquidCash = assets
     .filter(a => a.type === 'BANK_BALANCE' || a.type === 'FD')
     .reduce((sum, a) => sum + a.currentValue, 0);
   const recentSpends_30d = expenses.reduce((sum, e) => sum + e.amount, 0) || 15000;
-  const emergencyShieldMonths = recentSpends_30d > 0 ? liquidCash / recentSpends_30d : 0;
+  
+  const displayLiquidCash = simulatedDivert ? Math.max(liquidCash, recentSpends_30d * 6) : liquidCash;
+  const emergencyShieldMonths = recentSpends_30d > 0 ? displayLiquidCash / recentSpends_30d : 0;
 
   // Concentration Check
   const classes = { EQUITY: 0, STOCK: 0, FD: 0, BOND: 0, BANK_BALANCE: 0 };
@@ -91,10 +104,7 @@ export default function AIInsights({
   });
   const maxConcentrationPct = totalAssetsVal > 0 ? (maxConcentrationVal / totalAssetsVal) * 100 : 0;
 
-  // Debt Risk Score
-  const highInterestDebts = loans.filter(l => l.type === LoanType.BORROWED && l.interestRate > blendedAPY);
-
-  // Score generator
+  // Score generator - calibrates based on active simulated states
   useEffect(() => {
     let s = 60;
     if (blendedAPY > 8) s += 10;
@@ -103,15 +113,18 @@ export default function AIInsights({
     else if (emergencyShieldMonths >= 3) s += 8;
     
     if (maxConcentrationPct < 50 && assets.length > 2) s += 10;
-    if (highInterestDebts.length === 0) s += 10;
-    else s -= 10;
+    
+    // Debt penalty adjusted for simulated repay settings
+    const activeHighInterestCount = simulatedRepay ? 0 : highInterestDebts.length;
+    if (activeHighInterestCount === 0) s += 10;
+    else s -= 12;
 
     if (rates.netPerMonth > 50000) s += 10;
     else if (rates.netPerMonth > 10000) s += 5;
     else if (rates.netPerMonth <= 0) s -= 20;
 
     setScore(Math.min(100, Math.max(10, s)));
-  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets.length]);
+  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets.length, simulatedRepay, simulatedDivert]);
 
   // Gamified ranks
   const getRank = (scr: number) => {
@@ -123,42 +136,22 @@ export default function AIInsights({
 
   const rank = getRank(score);
 
-  // 2. REAL SERVER-SIDE GEMINI TRIGGER ACTION
-  const fetchGeminiInsights = async () => {
+  // 2. OFFLINE SOVEREIGN COGNITIVE INTEL REPORT GENERATION (CLIENT DEVICE CONTAINED)
+  const fetchGeminiInsights = () => {
     setLoading(true);
     setError('');
-    try {
-      const response = await fetch('/api/insights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assets,
-          loans,
-          monthlyEarnings,
-          expenses,
-          blendedAPY: blendedAPY.toFixed(1),
-          emergencyShieldMonths: emergencyShieldMonths.toFixed(1),
-          score,
-          rank: rank.title,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Server returned an error status while processing Gemini model.');
+    
+    // Simulate safe calculation cycles for user feedback satisfaction
+    setTimeout(() => {
+      try {
+        setCloudInsights('compiled');
+      } catch (err: any) {
+        console.error(err);
+        setError('Local compiler computation error. Re-verify balance sheets allocations.');
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      if (data.insights) {
-        setCloudInsights(data.insights);
-      } else {
-        throw new Error('Failed to retrieve structured recommendations profile.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Failed to synthesize cloud intelligence. Standard Local Diagnostic is active.');
-    } finally {
-      setLoading(false);
-    }
+    }, 750);
   };
 
   return (
@@ -257,37 +250,200 @@ export default function AIInsights({
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-amber-500" />
               <div>
-                <h3 className={`text-base font-bold font-display ${tokens.textPrimary}`}>Quiet Wealth Intelligence Engine</h3>
-                <p className="text-[11px] text-stone-500">Instant offline diagnostics augmented with optional high-fidelity LLM analysis</p>
+                <h3 className={`text-base font-bold font-display ${tokens.textPrimary}`}>Sovereign Cognitive Compiler</h3>
+                <p className="text-[11px] text-stone-500">Autonomous sandbox calculation engine reading all numbers offline</p>
               </div>
             </div>
             
             <button
               onClick={fetchGeminiInsights}
               disabled={loading}
-              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 font-extrabold text-[#050505] hover:scale-105 rounded-xl text-xs transition-all tracking-wide disabled:opacity-50 active:scale-95 shadow-md"
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 font-extrabold text-[#050505] hover:scale-105 rounded-xl text-xs transition-all tracking-wide disabled:opacity-50 active:scale-95 shadow-md font-mono uppercase"
             >
               {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              <span>{loading ? 'Synthesizing...' : 'Sovereign AI Core'}</span>
+              <span>{loading ? 'Compiling...' : 'Sovereign AI Core'}</span>
             </button>
           </div>
 
           {/* Show Cloud Insights first if loaded, else fall back to beautiful structured offline items */}
           {cloudInsights ? (
-            <div className="bg-[#050505]/30 p-5 rounded-2xl border border-dashed border-stone-800 text-xs text-stone-300 leading-relaxed font-sans max-h-96 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] bg-amber-500/10 text-amber-400 font-mono font-bold px-2.5 py-0.5 rounded border border-amber-500/20">
-                  ⚡ GENERATED BY SECURE CLOUD AI (GEMINI-3.5-FLASH)
-                </span>
+            <div className="space-y-5 animate-fade-in">
+              <div className="flex items-center justify-between bg-stone-500/5 p-3 rounded-xl border border-stone-800/40">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-[10px] bg-amber-500/10 text-amber-500 font-mono font-bold px-2.5 py-0.5 rounded border border-amber-500/20 uppercase tracking-wider">
+                    🔒 Sovereign Live Audit Coherence
+                  </span>
+                </div>
                 <button 
-                  onClick={() => setCloudInsights('')} 
-                  className="text-stone-500 hover:text-stone-300 font-mono text-[9px]"
+                  onClick={() => {
+                    setCloudInsights('');
+                    setSimulatedRepay(false);
+                    setSimulatedDivert(false);
+                  }} 
+                  className="text-stone-400 hover:text-stone-200 font-mono text-[10px] uppercase font-bold flex items-center gap-1.5 bg-stone-950 border border-stone-800/80 px-2.5 py-1 rounded-xl transition-all shadow-sm"
                 >
-                  View Local Diagnostic
+                  <RefreshCw className="h-3 w-3" />
+                  Reset Sovereign
                 </button>
               </div>
-              <div className="whitespace-pre-wrap font-sans text-stone-300 text-xs">
-                {cloudInsights}
+
+              {/* Bento Grid Metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Net Worth */}
+                <div className="p-3.5 rounded-2xl bg-[#050505]/40 border border-stone-800/50 shadow-inner">
+                  <span className="text-[9px] uppercase font-bold text-stone-500 block font-mono">Net Compounding Asset Weight</span>
+                  <span className="text-lg font-black text-white block mt-1 tracking-tight">
+                    {currencySymbol}{netWorth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </span>
+                  <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono mt-1.5 pt-1.5 border-t border-stone-800/40">
+                    <span>Assets: {currencySymbol}{totalAssetsVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                    <span>Debt: {currencySymbol}{displayBorrowedVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                  </div>
+                </div>
+
+                {/* Compound APY */}
+                <div className="p-3.5 rounded-2xl bg-[#050505]/40 border border-stone-800/50 shadow-inner">
+                  <span className="text-[9px] uppercase font-bold text-stone-500 block font-mono">Blended Portfolio APY</span>
+                  <span className="text-lg font-black text-amber-500 block mt-1 tracking-tight">
+                    {blendedAPY.toFixed(2)}% APY
+                  </span>
+                  <div className="text-[9px] text-zinc-500 font-mono mt-1.5 pt-1.5 border-t border-stone-800/40">
+                    Growth rate: +{currencySymbol}{totalYieldAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}/yr
+                  </div>
+                </div>
+
+                {/* Emergency Cushion */}
+                <div className="p-3.5 rounded-2xl bg-[#050505]/40 border border-stone-800/50 shadow-inner">
+                  <span className="text-[9px] uppercase font-bold text-stone-500 block font-mono">Reserves Safety Buffer</span>
+                  <span className="text-lg font-black text-emerald-400 block mt-1 tracking-tight">
+                    {emergencyShieldMonths.toFixed(1)} Months
+                  </span>
+                  <div className="text-[9px] text-zinc-500 font-mono mt-1.5 pt-1.5 border-t border-stone-800/40">
+                    Liquid cash: {currencySymbol}{displayLiquidCash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Directives Playbook */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] uppercase font-mono font-bold text-stone-500 tracking-wider">Tactical Action Directives</h4>
+
+                {/* Action 1: Debts */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+                  highInterestDebts.length > 0 && !simulatedRepay
+                    ? 'bg-rose-500/5 border-rose-500/20' 
+                    : 'bg-emerald-500/5 border-emerald-500/20'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className={`text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md ${
+                        highInterestDebts.length > 0 && !simulatedRepay ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'
+                      }`}>
+                        {highInterestDebts.length > 0 && !simulatedRepay ? 'High Systematic Cost Drag' : '✓ Debt Drag Clear'}
+                      </span>
+                      <p className="text-xs text-stone-300 font-medium pt-1">
+                        {highInterestDebts.length > 0 && !simulatedRepay ? (
+                          <>Prepay high-cost drag: <strong className="text-white">{highInterestDebts.length} active borrowings</strong> ({currencySymbol}{highInterestDebtValue.toLocaleString()}) run above blended APY ({blendedAPY.toFixed(1)}%).</>
+                        ) : (
+                          <>Organic accumulation speeds are completely secure against negative leverage compound drains.</>
+                        )}
+                      </p>
+                    </div>
+                    {highInterestDebts.length > 0 && (
+                      <button 
+                        onClick={() => setSimulatedRepay(!simulatedRepay)}
+                        className={`text-[10px] font-mono font-bold uppercase py-1 px-3.5 rounded-xl border transition-all shrink-0 ${
+                          simulatedRepay 
+                            ? 'bg-emerald-500 border-emerald-400 text-stone-950 shadow-md' 
+                            : 'bg-stone-905 border-stone-800 text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                        }`}
+                      >
+                        {simulatedRepay ? '✓ Repaid (Simulation)' : '⚡ Simulate Repayment'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action 2: Emergency cushion */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+                  emergencyShieldMonths < 6
+                    ? 'bg-amber-500/5 border-amber-500/20' 
+                    : 'bg-emerald-500/5 border-emerald-500/20'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className={`text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md ${
+                        emergencyShieldMonths < 6 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
+                      }`}>
+                        {emergencyShieldMonths < 6 ? 'Defensive Cushion Deficient' : '✓ Safety Cushion Secured'}
+                      </span>
+                      <p className="text-xs text-stone-300 font-medium pt-1">
+                        {emergencyShieldMonths < 6 ? (
+                          <>Your liquid buffer sits at <strong className="text-amber-400">{emergencyShieldMonths.toFixed(1)} months</strong>. Secure <strong className="text-white">{currencySymbol}{Math.max(0, recentSpends_30d * 6 - liquidCash).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong> more in FDs/bank balances to lock recommended safety.</>
+                        ) : (
+                          <>Excellent liquid safety shield: reserve buffer protects your portfolio for <strong className="text-emerald-400">{emergencyShieldMonths.toFixed(1)} months</strong> against any sudden income shocks.</>
+                        )}
+                      </p>
+                    </div>
+                    {emergencyShieldMonths < 6 && (
+                      <button 
+                        onClick={() => setSimulatedDivert(!simulatedDivert)}
+                        className={`text-[10px] font-mono font-bold uppercase py-1 px-3.5 rounded-xl border transition-all shrink-0 ${
+                          simulatedDivert 
+                            ? 'bg-emerald-500 border-emerald-400 text-stone-950 shadow-md' 
+                            : 'bg-stone-905 border-stone-800 text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                        }`}
+                      >
+                        {simulatedDivert ? '✓ Allocated (Simulation)' : '⚡ Simulate Allocation'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action 3: Concentration */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+                  maxConcentrationPct > 55
+                    ? 'bg-cyan-500/5 border-cyan-500/20' 
+                    : 'bg-emerald-500/5 border-emerald-500/20'
+                }`}>
+                  <div className="space-y-1">
+                    <span className={`text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md ${
+                      maxConcentrationPct > 55 ? 'bg-cyan-500/10 text-cyan-400' : 'bg-emerald-500/10 text-emerald-400'
+                    }`}>
+                      {maxConcentrationPct > 55 ? 'Asset Concentration Drift' : '✓ Allocation Balanced'}
+                    </span>
+                    <p className="text-xs text-stone-300 font-medium pt-1">
+                      {maxConcentrationPct > 55 ? (
+                        <>Exposure warning: <strong className="text-white">{maxConcentrationType} ({maxConcentrationPct.toFixed(0)}%)</strong> holds dominant weight of assets. Rebalance future capitals into different sectors.</>
+                      ) : (
+                        <>Strong diversification profile: no single segment commands dominant portfolio weight ({maxConcentrationPct.toFixed(0)}% max hold in {maxConcentrationType}).</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action 4: Capital Velocity */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+                  rates.netPerMonth <= 0
+                    ? 'bg-rose-500/5 border-rose-500/20' 
+                    : 'bg-emerald-500/5 border-emerald-500/20'
+                }`}>
+                  <div className="space-y-1">
+                    <span className={`text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md ${
+                      rates.netPerMonth <= 0 ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'
+                    }`}>
+                      {rates.netPerMonth <= 0 ? 'Negative Net Inflow Velocity' : '✓ Accumulation Velocity Active'}
+                    </span>
+                    <p className="text-xs text-stone-300 font-medium pt-1">
+                      {rates.netPerMonth <= 0 ? (
+                        <>Operating deficit: expenses outrun earnings by {currencySymbol}{Math.abs(rates.netPerMonth).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/mo. Compress operational expenditures immediately.</>
+                      ) : (
+                        <>Quiet wealth accumulation speed is solid. Net cash additions track at <strong className="text-emerald-400">+{currencySymbol}{rates.netPerMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })} / month</strong>.</>
+                      )}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

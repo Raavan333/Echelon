@@ -5,13 +5,14 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, Calendar, Award, Compass, Timer, AlertTriangle, ShieldCheck, Edit3, X, CheckSquare } from 'lucide-react';
-import { EchelonTheme, FinancialGoal } from '../types';
+import { EchelonTheme, FinancialGoal, Asset } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { estimateTimeToGoal } from '../utils/math';
 
 interface GoalMilestonesProps {
   theme: EchelonTheme;
   goals: FinancialGoal[];
+  assets: Asset[];
   totalPortfolioValue: number;
   netYearlyFlow: number;
   onAddGoal: (goal: Omit<FinancialGoal, 'id'>) => void;
@@ -23,6 +24,7 @@ interface GoalMilestonesProps {
 export default function GoalMilestones({
   theme,
   goals,
+  assets,
   totalPortfolioValue,
   netYearlyFlow,
   onAddGoal,
@@ -35,6 +37,7 @@ export default function GoalMilestones({
   const [targetAmount, setTargetAmount] = useState<string>('');
   const [deadlineDate, setDeadlineDate] = useState<string>('');
   const [category, setCategory] = useState<string>('Capital Base');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
 
   // Goals CRUD edit states
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -42,6 +45,7 @@ export default function GoalMilestones({
   const [editTarget, setEditTarget] = useState<string>('');
   const [editDeadline, setEditDeadline] = useState<string>('');
   const [editCategory, setEditCategory] = useState<string>('Capital Base');
+  const [editAssetIds, setEditAssetIds] = useState<string[]>([]);
 
   const handleStartEditGoal = (g: FinancialGoal) => {
     setEditingGoalId(g.id);
@@ -49,6 +53,7 @@ export default function GoalMilestones({
     setEditTarget(g.targetAmount.toString());
     setEditDeadline(g.deadlineDate);
     setEditCategory(g.category);
+    setEditAssetIds(g.assetIds || []);
   };
 
   const handleSaveEditGoal = (id: string) => {
@@ -60,6 +65,7 @@ export default function GoalMilestones({
         targetAmount: tgt,
         deadlineDate: editDeadline,
         category: editCategory,
+        assetIds: editAssetIds,
       });
     }
     setEditingGoalId(null);
@@ -76,12 +82,14 @@ export default function GoalMilestones({
       targetAmount: parseFloat(targetAmount) || 0,
       deadlineDate,
       category,
+      assetIds: selectedAssetIds,
     });
 
     setName('');
     setTargetAmount('');
     setDeadlineDate('');
     setCategory('Capital Base');
+    setSelectedAssetIds([]);
     setShowAddForm(false);
   };
 
@@ -191,6 +199,70 @@ export default function GoalMilestones({
             </div>
           </div>
 
+          {/* Linked Assets Selection */}
+          <div className="pt-2 border-t border-stone-800/20 dark:border-stone-100/10">
+            <label className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1.5">Asset & Fund Support (Scope Backing)</label>
+            <div className="p-3 bg-zinc-950/60 rounded-xl border border-stone-800 space-y-2">
+              <div className="flex items-center justify-between pb-1.5 border-b border-stone-850">
+                <span className="text-[10.5px] uppercase font-bold text-amber-500 font-mono">Include Specific Funds only</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedAssetIds.length === assets.length) {
+                      setSelectedAssetIds([]);
+                    } else {
+                      setSelectedAssetIds(assets.map(a => a.id));
+                    }
+                  }}
+                  className="text-[9.5px] uppercase font-black text-amber-400 hover:text-amber-300 font-mono"
+                >
+                  {selectedAssetIds.length === assets.length ? 'Clear All' : 'Select All'}
+                </button>
+              </div>
+              
+              {assets.length === 0 ? (
+                <p className="text-[10px] text-stone-500 font-mono italic">No registered assets. Defaults to standard savings/liquid reserves progress.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-40 overflow-y-auto pr-1">
+                  {assets.map(asset => {
+                    const isChecked = selectedAssetIds.includes(asset.id);
+                    return (
+                      <label 
+                        key={asset.id} 
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
+                          isChecked 
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' 
+                            : 'bg-zinc-950/30 border-stone-850 hover:bg-zinc-900/40 text-stone-400 hover:text-stone-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedAssetIds(selectedAssetIds.filter(id => id !== asset.id));
+                            } else {
+                              setSelectedAssetIds([...selectedAssetIds, asset.id]);
+                            }
+                          }}
+                          className="rounded border-stone-700 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-stone-900 h-3.5 w-3.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-mono text-xs font-semibold block truncate leading-tight">{asset.name}</span>
+                          <span className="text-[9px] text-stone-500 font-mono italic block truncate leading-none mt-0.5">{asset.type}</span>
+                        </div>
+                        <span className="font-mono font-bold text-[10.5px] whitespace-nowrap">{currencySymbol}{asset.currentValue.toLocaleString()}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <p className="text-[9.5px] text-stone-500 font-mono mt-1.5 leading-relaxed">
+              💡 If no funds are checked, we will defaults to tracking this goal against your full total portfolio net worth. Choose custom funds to exclude/include elements like FD and Corporate Bonds only.
+            </p>
+          </div>
+
           <div className="flex items-center gap-2 justify-end">
             <button
               type="button"
@@ -219,13 +291,19 @@ export default function GoalMilestones({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {goals.map((g) => {
-            const yearsToGoal = estimateTimeToGoal(g.targetAmount, totalPortfolioValue, netYearlyFlow);
-            const status = getGoalStatus(totalPortfolioValue, g.targetAmount, yearsToGoal);
+            const hasCustomAssets = g.assetIds !== undefined && g.assetIds.length > 0;
+            const backingValue = hasCustomAssets
+              ? assets.filter(a => g.assetIds?.includes(a.id)).reduce((sum, a) => sum + a.currentValue, 0)
+              : totalPortfolioValue;
+
+            const yearsToGoal = estimateTimeToGoal(g.targetAmount, backingValue, netYearlyFlow);
+            const status = getGoalStatus(backingValue, g.targetAmount, yearsToGoal);
             
             // Percentage toward goal
-            const progress = totalPortfolioValue > 0 
-              ? Math.max(0, Math.min(100, (totalPortfolioValue / g.targetAmount) * 100))
-              : 0;              const isEditing = editingGoalId === g.id;
+            const progress = backingValue > 0 
+              ? Math.max(0, Math.min(100, (backingValue / g.targetAmount) * 100))
+              : 0;
+            const isEditing = editingGoalId === g.id;
 
               if (isEditing) {
                 return (
@@ -283,6 +361,37 @@ export default function GoalMilestones({
                           onChange={(e) => setEditDeadline(e.target.value)}
                           className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none"
                         />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Fund & Asset Support (Pre-allocated)</label>
+                        <div className="space-y-1.5 p-2 bg-stone-900 border border-stone-800 rounded-lg max-h-36 overflow-y-auto">
+                          {assets.length === 0 ? (
+                            <span className="text-[10px] text-stone-500 italic">No assets available.</span>
+                          ) : (
+                            assets.map(asset => {
+                              const isChecked = editAssetIds.includes(asset.id);
+                              return (
+                                <label key={asset.id} className="flex items-center gap-2 cursor-pointer select-none text-[10px] text-stone-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setEditAssetIds(editAssetIds.filter(id => id !== asset.id));
+                                      } else {
+                                        setEditAssetIds([...editAssetIds, asset.id]);
+                                      }
+                                    }}
+                                    className="rounded border-stone-800 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-stone-955 h-3 w-3"
+                                  />
+                                  <span className="flex-1 truncate font-mono">{asset.name}</span>
+                                  <span className="font-mono font-bold text-stone-400">{currencySymbol}{asset.currentValue.toLocaleString()}</span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -368,7 +477,31 @@ export default function GoalMilestones({
                         <div className="w-full h-1.5 bg-stone-500/10 rounded-full overflow-hidden mb-1">
                           <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                         </div>
-                        <span className="text-[9px] text-stone-500 font-mono font-bold block text-right">{progress.toFixed(0)}% Secured</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] text-stone-500 font-mono">Current Backing: <strong className="text-stone-300 font-semibold">{currencySymbol}{backingValue.toLocaleString()}</strong></span>
+                          <span className="text-[9px] text-stone-500 font-mono font-bold">{progress.toFixed(0)}% Secured</span>
+                        </div>
+                      </div>
+
+                      {/* Linked Assets Backing Display */}
+                      <div className="pt-2 border-t border-stone-800/10 dark:border-stone-100/5 mt-1">
+                        <span className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Backing Assets Scope ({hasCustomAssets ? g.assetIds?.length : 'All Active'})</span>
+                        {hasCustomAssets ? (
+                          <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                            {assets.filter(a => g.assetIds?.includes(a.id)).map(a => (
+                              <span key={a.id} className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-stone-300" title={`${a.name}: ${currencySymbol}${a.currentValue.toLocaleString()}`}>
+                                {a.name} ({currencySymbol}{a.currentValue.toLocaleString()})
+                              </span>
+                            ))}
+                            {assets.filter(a => g.assetIds?.includes(a.id)).length === 0 && (
+                              <span className="text-[9px] font-mono text-stone-500 italic">No matching active asset discovered</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-stone-800/20 border border-stone-800/10 text-stone-400 block truncate">
+                            Global Portfolio Net Worth
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

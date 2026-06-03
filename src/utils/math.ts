@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CompoundingFrequency, AssetType, Asset, Loan, LoanType, Expense, Budget } from '../types';
+import { CompoundingFrequency, AssetType, Asset, Loan, LoanType, Expense, Budget, CreditCard } from '../types';
 
 /**
  * Returns number of compounding periods per year based on frequency enum.
@@ -105,7 +105,10 @@ export function calculateWealthRates(
   loans: Loan[],
   monthlyEarnings: number,
   expenses: Expense[],
-  totalPortfolioValue: number
+  totalPortfolioValue: number,
+  userOverriddenExpenses?: number,
+  customSavingsGoalAmt?: number,
+  budgetAmount?: number
 ): WealthRates {
   // 1. Earned Income flows:
   // Recurring monthly earnings
@@ -154,17 +157,18 @@ export function calculateWealthRates(
     }
   });
 
-  // Expenses flow rate:
-  // Can calculate the expense speed based on standard expenses registered.
-  // Let's safe-sample actual spends in past 30 days, or fallback on standard monthly budget cap.
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const recentSpends = expenses
-    .filter(e => new Date(e.date) >= thirtyDaysAgo)
-    .reduce((sum, e) => sum + e.amount, 0);
-  
-  // Imputed annual expense rate (recent spends normalized, or standard monthly average)
-  const imputedMonthlyExpense = recentSpends > 0 ? recentSpends : (expenses.length > 0 ? (expenses.reduce((sum, e) => sum + e.amount, 0) / expenses.length) * 30 : 15000); // 15k Rs default
+  // Expenses flow rate representing overall monthly "Sink"
+  let imputedMonthlyExpense = 15000; // Base default fallback
+  if (userOverriddenExpenses !== undefined && userOverriddenExpenses > 0) {
+    imputedMonthlyExpense = userOverriddenExpenses;
+  } else {
+    // Default dynamic sink: configured budget + current month logged spends + buffer (default 1000)
+    const budgetCap = budgetAmount || 0;
+    const currentMonthLoggedExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const configuredBuffer = customSavingsGoalAmt !== undefined ? customSavingsGoalAmt : 1000;
+    imputedMonthlyExpense = budgetCap + currentMonthLoggedExpenses + configuredBuffer;
+  }
+
   const annualExpenseRate = imputedMonthlyExpense * 12;
 
   const totalAnnualLosses = loansAnnualPassiveCosts + annualExpenseRate;
@@ -222,4 +226,40 @@ export function estimateTimeToGoal(targetAmount: number, currentPortfolio: numbe
     return Infinity; // Under current rate, it is impossible (losing money or zero net positive flow)
   }
   return (targetAmount - currentPortfolio) / netPerYear;
+}
+
+/**
+ * Calculates additional interest accrued on overdue credit card statement bills.
+ */
+export function calculateCreditCardOverdueInterest(card: CreditCard, asOf: Date = new Date()): number {
+  if (!card.dueDate || !card.lastBillAmount || card.lastBillAmount <= 0) return 0;
+  
+  const dueTime = new Date(card.dueDate).getTime();
+  const current = asOf.getTime();
+  if (current <= dueTime) return 0;
+  
+  // Overdue! Compounds/grows at the configured APR (annual rate) over the past overdue days
+  const diffDays = (current - dueTime) / (1000 * 60 * 60 * 24);
+  const t = diffDays / 365.25; // in years
+  const r = (card.apr || 36) / 100;
+  
+  const interestAccrued = card.lastBillAmount * r * t;
+  return Math.max(0, parseFloat(interestAccrued.toFixed(2)));
+}
+
+/**
+ * Returns the effective liability amount that affects portfolio / net worth for a credit card.
+ * Only overdue card statement balances count as liability (reduces total net worth).
+ * If in buffer period or usage hasn't generated statement, it does not affect portfolio / net worth.
+ */
+export function calculateCreditCardEffectiveLiability(card: CreditCard, asOf: Date = new Date()): number {
+  if (!card.dueDate || !card.lastBillAmount || card.lastBillAmount <= 0) return 0;
+  
+  const dueTime = new Date(card.dueDate).getTime();
+  const current = asOf.getTime();
+  if (current <= dueTime) return 0; // Still inside interest free / grace buffer time
+  
+  // Past end buffer date: Billed amount + accrued overdue compound interest is active liability
+  const overdueInterest = calculateCreditCardOverdueInterest(card, asOf);
+  return Math.max(0, parseFloat((card.lastBillAmount + overdueInterest).toFixed(2)));
 }

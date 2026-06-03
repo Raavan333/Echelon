@@ -7,9 +7,37 @@ import { EchelonState, AssetType, LoanType } from '../types';
 import { calculateLoanCurrentBalance, calculateWealthRates } from './math';
 
 /**
- * Triggers a download of a text blob as a file in the browser.
+ * Triggers a download of a text blob as a file in the browser, with Web Share fallback for Android.
  */
 export function downloadBlob(content: string, filename: string, mimeType: string) {
+  // Always trigger the traditional download first as the primary robust action
+  try {
+    triggerTraditionalDownload(content, filename, mimeType);
+    console.log('Successfully completed traditional download anchor link click');
+  } catch (traditionalError) {
+    console.warn('Traditional download anchor link failed, attempting Web Share fallback:', traditionalError);
+  }
+
+  // Double check if Web Share is also available for high mobile flexibility
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try {
+      const file = new File([content], filename, { type: mimeType });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: `Echelon - ${filename}`,
+          text: `Echelon quiet wealth statement export and secure ledger backup.`
+        }).catch(err => {
+          console.warn('Web Share dismissed or failed:', err);
+        });
+      }
+    } catch (shareErr) {
+      console.warn('Web Share failed configuration:', shareErr);
+    }
+  }
+}
+
+function triggerTraditionalDownload(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

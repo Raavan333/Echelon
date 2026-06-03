@@ -5,8 +5,8 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, ArrowUpRight, ShieldAlert, Sparkles, CheckSquare, Layers, Download, CheckCircle, FileSpreadsheet, FileText, Landmark, RefreshCw, Edit3, X } from 'lucide-react';
-import { EchelonTheme, Budget, Expense, BudgetPeriod, BudgetCategoryLimit } from '../types';
-import { getColorTokens } from '../utils/theme';
+import { EchelonTheme, Budget, Expense, BudgetPeriod, BudgetCategoryLimit, Asset, CreditCard } from '../types';
+import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
 import { generateCSVData, generateHTMLReport, downloadBlob } from '../utils/export';
 
 interface BudgetManagerProps {
@@ -16,6 +16,7 @@ interface BudgetManagerProps {
   budgetCategoryLimits?: BudgetCategoryLimit[];
   onConfigureBudget: (amount: number, period: BudgetPeriod, alertPercent: number) => void;
   onAddExpense: (expense: Omit<Expense, 'id'>) => void;
+  onAddOutflow?: (expenseData: { category: string; amount: number; date: string; notes: string }, source: { sourceType: 'bank_balance' | 'credit_card'; sourceId: string }) => void;
   onUpdateExpense?: (id: string, expense: Omit<Expense, 'id'>) => void;
   onRemoveExpense: (id: string) => void;
   onTriggerMonthEndReset: () => void;
@@ -23,6 +24,10 @@ interface BudgetManagerProps {
   onOpenSettings?: () => any;
   customAlertRules?: string[];
   onUpdateCategoryLimits?: (limits: BudgetCategoryLimit[]) => void;
+  assets?: Asset[];
+  creditCards?: CreditCard[];
+  selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
+  activeAccentColor?: string;
 }
 
 export default function BudgetManager({
@@ -32,6 +37,7 @@ export default function BudgetManager({
   budgetCategoryLimits = [],
   onConfigureBudget,
   onAddExpense,
+  onAddOutflow,
   onUpdateExpense,
   onRemoveExpense,
   onTriggerMonthEndReset,
@@ -39,8 +45,27 @@ export default function BudgetManager({
   onOpenSettings,
   customAlertRules = [],
   onUpdateCategoryLimits,
+  assets = [],
+  creditCards = [],
+  selectedProgressBarStyle = 'ultra-thin',
+  activeAccentColor,
 }: BudgetManagerProps) {
   const [showAddExpense, setShowAddExpense] = useState<boolean>(false);
+  const [sourceType, setSourceType] = useState<'bank_balance' | 'credit_card'>('bank_balance');
+  const [sourceId, setSourceId] = useState<string>('');
+
+  const bankAccounts = assets.filter(a => a.type === 'BANK_BALANCE');
+
+  // Set default sourceId on mount or if assets/cards shift
+  React.useEffect(() => {
+    if (sourceType === 'bank_balance') {
+      const firstBank = bankAccounts[0];
+      setSourceId(firstBank ? firstBank.id : '');
+    } else {
+      const firstCard = creditCards[0];
+      setSourceId(firstCard ? firstCard.id : '');
+    }
+  }, [sourceType, assets, creditCards]);
 
   // Default fallback categories
   const DEFAULT_CATEGORIES: BudgetCategoryLimit[] = [
@@ -111,12 +136,26 @@ export default function BudgetManager({
     e.preventDefault();
     if (!amount) return;
 
-    onAddExpense({
-      category,
-      amount: parseFloat(amount) || 0,
-      date,
-      notes,
-    });
+    const parsedAmount = parseFloat(amount) || 0;
+
+    if (onAddOutflow && sourceId) {
+      onAddOutflow({
+        category,
+        amount: parsedAmount,
+        date,
+        notes,
+      }, {
+        sourceType,
+        sourceId,
+      });
+    } else {
+      onAddExpense({
+        category,
+        amount: parsedAmount,
+        date,
+        notes,
+      });
+    }
 
     setAmount('');
     setNotes('');
@@ -309,17 +348,13 @@ export default function BudgetManager({
                   </span>
                 </div>
                 {/* Simulated bar progress indicators */}
-                <div className="w-full h-3 rounded-full bg-stone-300/10 border border-stone-800 p-0.5 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      isOverLimit 
-                        ? 'bg-rose-600 shadow-[0_0_8px_rgba(224,36,36,0.5)]' 
-                        : isApproachingLimit 
-                          ? 'bg-amber-500' 
-                          : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, spendPercentage)}%` }}
-                  />
+                <div className="w-full">
+                  {renderPremiumProgressBar(
+                    spendPercentage, 
+                    selectedProgressBarStyle, 
+                    isOverLimit ? 'bg-rose-600' : isApproachingLimit ? 'bg-amber-500' : 'bg-emerald-500', 
+                    activeAccentColor
+                  )}
                 </div>
               </div>
 
@@ -479,11 +514,13 @@ export default function BudgetManager({
                             {currencySymbol}{catSpend.toLocaleString('en-IN')} / {currencySymbol}{c.limit.toLocaleString('en-IN')}
                           </span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-stone-300/10 overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-300 ${catOver ? 'bg-red-500' : catPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${Math.min(100, catPct)}%` }}
-                          />
+                        <div className="w-full">
+                          {renderPremiumProgressBar(
+                            catPct, 
+                            selectedProgressBarStyle, 
+                            catOver ? 'bg-red-500' : catPct > 80 ? 'bg-amber-500' : 'bg-emerald-500', 
+                            activeAccentColor
+                          )}
                         </div>
                       </div>
                     );
@@ -527,20 +564,73 @@ export default function BudgetManager({
 
           {/* SPEND OUTFLOW CAPTURE FORM */}
           {showAddExpense && (
-            <form onSubmit={handleAddSpend} className="mb-4 p-3 rounded-xl border border-dashed border-stone-700/40 bg-stone-500/5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-fade-in">
+            <form onSubmit={handleAddSpend} className="mb-4 p-4 rounded-2xl border border-dashed border-stone-800 bg-stone-500/5 grid grid-cols-1 sm:grid-cols-2 gap-3.5 animate-fade-in">
               <div>
                 <label htmlFor="expense-category-select" className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Group classification</label>
                 <select
                   id="expense-category-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200"
+                  className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:border-amber-500/40 focus:outline-none"
                 >
                   {activeCategories.map((catObj) => (
                     <option key={catObj.category} value={catObj.category}>
                       {catObj.category} (Limit: {currencySymbol}{catObj.limit})
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Funding source </label>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('bank_balance')}
+                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${
+                      sourceType === 'bank_balance' 
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
+                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                    }`}
+                  >
+                    Bank Account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('credit_card')}
+                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${
+                      sourceType === 'credit_card' 
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
+                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                    }`}
+                  >
+                    Credit Card
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Select fund/Card anchor</label>
+                <select
+                  required
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:border-amber-500/40 focus:outline-none font-semibold"
+                >
+                  <option value="" disabled>-- Select Anchor --</option>
+                  {sourceType === 'bank_balance' ? (
+                    bankAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({currencySymbol}{a.currentValue.toLocaleString()})
+                      </option>
+                    ))
+                  ) : (
+                    creditCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} (Used: {currencySymbol}{c.usedBalance.toLocaleString()})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 

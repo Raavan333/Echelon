@@ -4,7 +4,26 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, DollarSign, Clock, CalendarDays, Percent, ShieldCheck, Flame, Award } from 'lucide-react';
+import { 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  TrendingUp, 
+  DollarSign, 
+  Clock, 
+  CalendarDays, 
+  Percent, 
+  ShieldCheck, 
+  Flame, 
+  Award, 
+  Landmark, 
+  HelpCircle, 
+  Edit3, 
+  Check, 
+  X, 
+  RefreshCw, 
+  Sliders, 
+  Coins 
+} from 'lucide-react';
 import { EchelonTheme, Asset, Loan, LoanType, Expense } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
@@ -19,7 +38,10 @@ interface HoldingSummaryProps {
   currencySymbol?: string;
   customSavingsGoalAmt?: number;
   userOverriddenExpenses?: number;
-  onOpenSettings?: () => any;
+  onUpdateUserOverriddenExpenses?: (val: number | undefined) => void;
+  onUpdateCustomSavingsGoalAmt?: (val: number) => void;
+  onOpenSettings?: (tab?: string) => any;
+  budgetAmount?: number;
 }
 
 type PeriodType = 'hour' | 'day' | 'month' | 'year' | '5year';
@@ -34,11 +56,12 @@ export default function HoldingSummary({
   currencySymbol = '₹',
   customSavingsGoalAmt,
   userOverriddenExpenses,
+  onUpdateUserOverriddenExpenses,
+  onUpdateCustomSavingsGoalAmt,
   onOpenSettings,
+  budgetAmount = 0,
 }: HoldingSummaryProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
-  const [isEditingEarnings, setIsEditingEarnings] = useState<boolean>(false);
-  const [earningsInput, setEarningsInput] = useState<string>(monthlyEarnings.toString());
   const [forecastYears, setForecastYears] = useState<number>(3);
   const [liveNetOffset, setLiveNetOffset] = useState<number>(0);
 
@@ -55,7 +78,18 @@ export default function HoldingSummary({
   
   const totalPortfolioValue = totalAssetsVal + totalLentVal - totalBorrowedVal;
 
-  const rates = calculateWealthRates(assets, loans, monthlyEarnings, expenses, totalPortfolioValue);
+  const rates = calculateWealthRates(
+    assets,
+    loans,
+    monthlyEarnings,
+    expenses,
+    totalPortfolioValue,
+    userOverriddenExpenses,
+    customSavingsGoalAmt,
+    budgetAmount
+  );
+
+  const monthlyGrowthPct = totalPortfolioValue > 0 ? (rates.netPerMonth / totalPortfolioValue) * 100 : 0;
 
   // Reset offset with changes to anchor state
   useEffect(() => {
@@ -144,14 +178,6 @@ export default function HoldingSummary({
   totalYieldAmount += totalLentVal * 0.12; 
   const blendedAPY = totalPie > 0 ? (totalYieldAmount / totalPie) * 100 : 0;
 
-  const handleSaveEarnings = () => {
-    const val = parseFloat(earningsInput);
-    if (!isNaN(val) && val >= 0) {
-      onSetMonthlyEarnings(val);
-      setIsEditingEarnings(false);
-    }
-  };
-
   // Forecast accumulation calculation with compound interest estimate
   const forecastPortfolioValues = Array.from({ length: 6 }).map((_, i) => {
     const yr = i;
@@ -179,24 +205,34 @@ export default function HoldingSummary({
             </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-            <div className="flex items-baseline gap-1">
+          <div className="flex flex-col gap-3 mb-2">
+            <div className="flex items-baseline flex-wrap gap-1">
               <h2 className={`text-3xl sm:text-5xl font-mono font-extrabold tracking-tight ${tokens.textPrimary}`}>
                 {currencySymbol}{Math.floor(totalPortfolioValue + liveNetOffset).toLocaleString('en-IN')}
               </h2>
               <span className="text-xl sm:text-2xl font-mono font-extrabold text-amber-500/90 tracking-tight animate-pulse shrink-0">
                 .{(Math.round(((totalPortfolioValue + liveNetOffset) % 1) * 100)).toString().padStart(2, '0')}
               </span>
-              <span className="text-[9px] uppercase font-bold tracking-widest font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ml-1 select-none animate-pulse">
-                <Flame className="h-3 w-3 text-emerald-400" />
-                <span>COMPOUNDING LIVE</span>
-              </span>
             </div>
 
-            {/* Gamified wealth level tier badge */}
-            <div className={`flex items-center gap-1.5 px-3 py-1 border text-[10px] font-bold font-mono uppercase rounded-xl shadow-sm tracking-wide select-none ${rankBadge.color} self-start sm:self-center`}>
-              <Award className="h-3.5 w-3.5" />
-              <span>{rankBadge.name}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {monthlyGrowthPct >= 0 ? (
+                <span className="text-[10px] uppercase font-black tracking-wider font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1 select-none shadow-sm">
+                  <Flame className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                  <span>+{monthlyGrowthPct.toFixed(2)}% / MO PROGRESS</span>
+                </span>
+              ) : (
+                <span className="text-[10px] uppercase font-black tracking-wider font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full flex items-center gap-1 select-none shadow-sm">
+                  <ArrowDownRight className="h-3.5 w-3.5 text-rose-400 animate-bounce" />
+                  <span>{monthlyGrowthPct.toFixed(2)}% / MO DROP</span>
+                </span>
+              )}
+
+              {/* Gamified wealth level tier badge */}
+              <div className={`flex items-center gap-1.5 px-3 py-1 border text-[10px] font-bold font-mono uppercase rounded-xl shadow-sm tracking-wide select-none ${rankBadge.color}`}>
+                <Award className="h-3.5 w-3.5" />
+                <span>{rankBadge.name}</span>
+              </div>
             </div>
           </div>
           
@@ -334,37 +370,17 @@ export default function HoldingSummary({
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Monthly Cash Influx</span>
-              {isEditingEarnings ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    id="monthly-earnings-edit-input"
-                    value={earningsInput}
-                    onChange={(e) => setEarningsInput(e.target.value)}
-                    className={`w-24 px-2 py-1 bg-stone-500/10 border ${tokens.border} rounded text-xs font-mono font-bold text-amber-500 focus:outline-none`}
-                  />
-                  <button
-                    type="button"
-                    id="save-earnings-btn"
-                    onClick={handleSaveEarnings}
-                    className="text-[10px] px-2 py-1 bg-emerald-600 text-white rounded font-bold"
-                  >
-                    Save
-                  </button>
-                </div>
-              ) : (
-                <p className={`text-sm font-bold font-mono ${tokens.textPrimary}`}>
-                  {currencySymbol}{monthlyEarnings.toLocaleString('en-IN')} /mo
-                </p>
-              )}
+              <p className={`text-sm font-bold font-mono ${tokens.textPrimary}`}>
+                {currencySymbol}{monthlyEarnings.toLocaleString('en-IN')} /mo
+              </p>
             </div>
             
-            {!isEditingEarnings && (
+            {onOpenSettings && (
               <button
                 type="button"
                 id="edit-earnings-btn"
-                onClick={() => setIsEditingEarnings(true)}
-                className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 font-mono px-2 py-1 rounded"
+                onClick={() => onOpenSettings('rules')}
+                className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 font-mono px-2 py-1 rounded hover:bg-amber-500/20 active:scale-95 transition-all"
               >
                 Configure
               </button>
@@ -489,6 +505,188 @@ export default function HoldingSummary({
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* 5. SALARY, SINK & SURPLUS ENGINE PANEL */}
+      <div className="lg:col-span-3 p-6 rounded-3xl border border-stone-800/80 bg-zinc-950/80 shadow-2xl relative overflow-hidden transition-all duration-300">
+        {/* Glow ambient accent lines */}
+        <div className="absolute top-0 right-0 h-[100px] w-[180px] bg-amber-500/5 rounded-full blur-[60px] pointer-events-none" />
+        
+        {/* Header indicator */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-850/80">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shrink-0 mt-0.5">
+              <Landmark className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm uppercase font-black tracking-wider text-amber-500 font-mono">Echelon Treasury Sink & Surplus Engine</h3>
+              <p className="text-[11px] leading-relaxed text-stone-400 mt-1">
+                Decide your monthly cash influx and operational sinks. By default, Echelon decides the sink pool from your current monthly budget, logged expenditures, and customized buffer limits. You can edit are overrides as desired.
+              </p>
+            </div>
+          </div>
+          <span className="text-[9px] uppercase font-bold tracking-widest font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full shrink-0 h-fit select-none">
+            LEDGER SANDBOX
+          </span>
+        </div>
+
+        {/* Triple allocation flow layout */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+          
+          {/* A. MONTHLY INFLUX (SALARY) */}
+          <div className="p-4 rounded-xl bg-stone-900/40 border border-stone-850 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-stone-500 font-mono">1. Monthly Influx (Salary)</span>
+                <Coins className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+              
+              <div className="mt-2">
+                <div className="text-2xl font-mono font-extrabold text-stone-200">
+                  {currencySymbol}{monthlyEarnings.toLocaleString()}
+                </div>
+                <span className="text-[10px] text-stone-550 font-mono italic block mt-1">
+                  Adjustable inside User Profile settings
+                </span>
+              </div>
+            </div>
+            <p className="text-[9px] text-stone-450 leading-relaxed mt-4">
+              Monthly Cash Injection representing salary, business, and raw yield earnings metrics.
+            </p>
+          </div>
+
+          {/* B. OPERATIVE TREASURY SINK */}
+          <div className="p-4 rounded-xl bg-stone-900/40 border border-stone-850 flex flex-col justify-between relative">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-stone-500 font-mono">2. Operative Treasury Sink</span>
+                <span className={`text-[8px] font-extrabold font-mono uppercase px-1.5 py-0.2 rounded border ${
+                  userOverriddenExpenses !== undefined 
+                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/25' 
+                    : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25'
+                }`}>
+                  {userOverriddenExpenses !== undefined ? 'User Override' : 'Dynamic Auto'}
+                </span>
+              </div>
+
+              {/* Display Sink Values */}
+              <div className="mt-2 space-y-2">
+                <div className="flex items-baseline gap-1">
+                  <div className="text-2xl font-mono font-extrabold text-amber-500">
+                    {currencySymbol}{Math.floor(
+                      userOverriddenExpenses !== undefined 
+                        ? userOverriddenExpenses 
+                        : (budgetAmount + expenses.reduce((sum, e) => sum + e.amount, 0) + (customSavingsGoalAmt !== undefined ? customSavingsGoalAmt : 1000))
+                    ).toLocaleString()}
+                  </div>
+                  <span className="text-[10px] text-stone-400 font-mono">/mo sink</span>
+                </div>
+
+                {/* Sub-breakdowns (Readonly) */}
+                {userOverriddenExpenses === undefined ? (
+                  <div className="text-[10px] leading-relaxed text-stone-400 space-y-1 bg-zinc-950/40 p-2 rounded-xl border border-stone-850 mt-1">
+                    <div className="flex justify-between">
+                      <span className="text-stone-500">Config Budget:</span>
+                      <span className="font-mono">{currencySymbol}{budgetAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-stone-500">Logged Spends:</span>
+                      <span className="font-mono text-rose-400">+{currencySymbol}{expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-stone-500">Buffer Spends:</span>
+                      <span className="font-mono">+{currencySymbol}{(customSavingsGoalAmt !== undefined ? customSavingsGoalAmt : 1000).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[10px] leading-relaxed text-stone-400 bg-zinc-950/40 p-2 rounded-xl border border-stone-850 mt-1">
+                    <p className="text-stone-400 font-sans italic">
+                      Locked to a direct override value. Modify or restore dynamic auto calculations inside Goals & Sinks settings.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-[9px] text-stone-450 leading-relaxed mt-4">
+              All monthly budget caps + credit card bills or expense items, plus customizable buffer drains.
+            </p>
+          </div>
+
+          {/* C. MONTHLY SAVED SURPLUS */}
+          <div className="p-4 rounded-xl bg-stone-900/40 border border-stone-850 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-stone-500 font-mono">3. Saved surplus Remaining</span>
+                <Sliders className="h-3.5 w-3.5 text-emerald-500" />
+              </div>
+
+              {/* Calculations Surplus */}
+              {(() => {
+                const computedOverallSink = userOverriddenExpenses !== undefined 
+                  ? userOverriddenExpenses 
+                  : (budgetAmount + expenses.reduce((sum, e) => sum + e.amount, 0) + (customSavingsGoalAmt !== undefined ? customSavingsGoalAmt : 1000));
+                
+                const savingsSurplus = Math.max(0, monthlyEarnings - computedOverallSink);
+                
+                // Let's decide if there are outstanding liabilities (Borrowed Loans)
+                const outstandingDebts = loans.filter(l => l.type === LoanType.BORROWED).reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
+                
+                return (
+                  <div className="mt-2 space-y-3">
+                    <div className="text-2xl font-mono font-extrabold text-emerald-400">
+                      {currencySymbol}{savingsSurplus.toLocaleString()}
+                    </div>
+
+                    <div className="space-y-1.5 p-2 bg-zinc-950/40 rounded-xl border border-stone-850 text-[10px]">
+                      <span className="text-[9.5px] uppercase font-extrabold text-stone-400 font-mono block mb-1">
+                        Surplus allocations:
+                      </span>
+                      {outstandingDebts > 0 && savingsSurplus > 0 ? (
+                        <>
+                          <div className="flex justify-between text-stone-300">
+                            <span className="text-stone-500">⚡ Debt Prepay (30%):</span>
+                            <span className="font-mono text-amber-500 font-bold">
+                              {currencySymbol}{Math.floor(savingsSurplus * 0.3).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-[8px] text-amber-500/80 mb-2 leading-relaxed">
+                            Recommended arbitrage to reduce compounding interest costs.
+                          </p>
+
+                          <div className="flex justify-between text-stone-300">
+                            <span className="text-stone-500">📈 Passive Asset (70%):</span>
+                            <span className="font-mono font-bold">
+                              {currencySymbol}{Math.floor(savingsSurplus * 0.7).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-[8px] text-stone-500 leading-relaxed">
+                            Routed to passive assets for compounding yield values.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-stone-300">
+                            <span className="text-stone-500">📈 Asset Growth (100%):</span>
+                            <span className="font-mono font-bold text-emerald-400">
+                              {currencySymbol}{savingsSurplus.toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-[8px] text-stone-450 leading-relaxed mt-1">
+                            No active payables! 100% is directed to passive asset appreciation.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+            <p className="text-[9px] text-stone-500 leading-relaxed mt-4">
+              Definitive treasury volume saved. High surplus rates yield extremely compounding passive growth vectors.
+            </p>
+          </div>
+
         </div>
       </div>
 

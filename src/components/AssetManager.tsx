@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit3, CircleDollarSign, Landmark, RefreshCw, BarChart } from 'lucide-react';
 import { EchelonTheme, Asset, AssetType } from '../types';
-import { getColorTokens } from '../utils/theme';
+import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
 
 interface AssetManagerProps {
   theme: EchelonTheme;
@@ -17,6 +17,8 @@ interface AssetManagerProps {
   onRemoveAsset: (id: string) => void;
   currencySymbol?: string;
   onOpenSettings?: () => any;
+  selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
+  activeAccentColor?: string;
 }
 
 export default function AssetManager({
@@ -28,6 +30,8 @@ export default function AssetManager({
   onRemoveAsset,
   currencySymbol = '₹',
   onOpenSettings,
+  selectedProgressBarStyle = 'ultra-thin',
+  activeAccentColor,
 }: AssetManagerProps) {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
@@ -353,11 +357,8 @@ export default function AssetManager({
                                   {isMatured ? 'Liquid Available' : `• ${daysLeft} days left`}
                                 </span>
                               </div>
-                              <div className="w-28 h-1.5 rounded-full bg-stone-300/10 border border-stone-800 p-0.5 overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full ${isMatured ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                  style={{ width: `${pct}%` }}
-                                />
+                              <div className="w-28 mt-1">
+                                {renderPremiumProgressBar(pct, selectedProgressBarStyle, isMatured ? 'bg-emerald-500' : 'bg-amber-500', activeAccentColor)}
                               </div>
                             </div>
                           );
