@@ -43,7 +43,8 @@ import {
   AlertRule,
   CreditCard,
   OutflowLog,
-  AcknowledgedAlertRecord
+  AcknowledgedAlertRecord,
+  FundTransfer
 } from './types';
 
 // Child components
@@ -93,6 +94,9 @@ const createInitialState = (): EchelonState => ({
   acknowledgedAlerts: [],
   selectedFontOption: 'classic-inter',
   selectedProgressBarStyle: 'ultra-thin',
+  transfers: [],
+  securityTimeoutMinutes: 30,
+  compiledInsightsText: '',
 });
 
 export default function App() {
@@ -136,6 +140,13 @@ export default function App() {
   // Undo System states
   const [undoStack, setUndoStack] = useState<EchelonState[]>([]);
   const [lastActionMessage, setLastActionMessage] = useState<string>('');
+
+  // Backup & Report helper modal states
+  const [downloadModalOpen, setDownloadModalOpen] = useState<boolean>(false);
+  const [downloadModalTitle, setDownloadModalTitle] = useState<string>('');
+  const [downloadModalFilename, setDownloadModalFilename] = useState<string>('');
+  const [downloadModalContent, setDownloadModalContent] = useState<string>('');
+  const [copyFeedbackActive, setCopyFeedbackActive] = useState<boolean>(false);
 
   // Read matching PIN configurations on mount
   useEffect(() => {
@@ -193,10 +204,18 @@ export default function App() {
     document.title = "Echelon Vault | Quiet Wealth Ledger";
   }, [vaultData?.selectedGalleryIcon, publicIcon]);
 
-  // Atomic dual-timer security lockout: 15s UI idle, 10s tab background
+  // Atomic dual-timer security lockout: customizable UI idle timeout & background tab safety threshold
   useEffect(() => {
-    if (isLocked) return;
+    if (isLocked || !vaultData) return;
 
+    const timeoutMin = vaultData.securityTimeoutMinutes !== undefined ? vaultData.securityTimeoutMinutes : 30;
+    
+    // 0 means NEVER auto-lock
+    if (timeoutMin === 0) {
+      return;
+    }
+
+    const idleTimeoutMs = timeoutMin * 60 * 1000;
     let idleTimer: ReturnType<typeof setTimeout>;
     let backgroundTime: number | null = null;
 
@@ -205,7 +224,7 @@ export default function App() {
       idleTimer = setTimeout(() => {
         setIsLocked(true);
         setActivePin(''); // Flush sensitive in-memory key state on lockout
-      }, 15000); // 15s active idle timeout
+      }, idleTimeoutMs);
     };
 
     const handleVisibilityChange = () => {
@@ -213,9 +232,10 @@ export default function App() {
         backgroundTime = Date.now();
       } else if (backgroundTime !== null) {
         const elapsed = (Date.now() - backgroundTime) / 1000;
-        if (elapsed >= 10) {
+        // Background lockout matches the idle timeout in seconds
+        if (elapsed >= timeoutMin * 60) {
           setIsLocked(true);
-          setActivePin(''); // Lock out if backgrounded >= 10 seconds
+          setActivePin(''); 
         }
         backgroundTime = null;
       }
@@ -241,7 +261,7 @@ export default function App() {
       window.removeEventListener('scroll', resetIdleTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isLocked]);
+  }, [isLocked, vaultData?.securityTimeoutMinutes]);
 
   // Theme auto-rotate slideshow effect
   useEffect(() => {
@@ -274,7 +294,7 @@ export default function App() {
     }, intervalSec * 1000);
 
     return () => clearInterval(cycleTimer);
-  }, [vaultData?.slideshowEnabled, vaultData?.slideshowIntervalSeconds, vaultData?.theme.palette, isLocked]);
+  }, [vaultData, isLocked]);
 
   // Decryption callback handling from UI passcode dial
   const handleUnlockAndDecrypt = (pin: string): boolean => {
@@ -474,6 +494,40 @@ export default function App() {
       ...current,
       assets: current.assets.filter(a => a.id !== id),
     }));
+  };
+
+  const handleCreateTransfer = (transfer: Omit<FundTransfer, 'id' | 'date'>) => {
+    const newTransfer: FundTransfer = {
+      ...transfer,
+      id: `trf-${Date.now()}`,
+      date: new Date().toISOString()
+    };
+    
+    mutateVaultData(`Transferred ${vaultData?.currencySymbol || '₹'}${newTransfer.netAmountTransferred} from ${newTransfer.sourceAssetName} to ${newTransfer.destinationAssetName}`, (current) => {
+      const updatedAssets = current.assets.map(asset => {
+        if (asset.id === transfer.sourceAssetId) {
+          return {
+            ...asset,
+            currentValue: Math.max(0, asset.currentValue - transfer.baseAmount),
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        if (asset.id === transfer.destinationAssetId) {
+          return {
+            ...asset,
+            currentValue: asset.currentValue + transfer.netAmountTransferred,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return asset;
+      });
+      
+      return {
+        ...current,
+        assets: updatedAssets,
+        transfers: [newTransfer, ...(current.transfers || [])]
+      };
+    });
   };
 
   const handleAddLoan = (loanData: Omit<Loan, 'id' | 'lastUpdated'>) => {
@@ -882,6 +936,22 @@ export default function App() {
     });
   };
 
+  const handleUpdateSecurityTimeoutMinutes = (minutes: number) => {
+    if (!vaultData) return;
+    saveVaultData({
+      ...vaultData,
+      securityTimeoutMinutes: minutes,
+    });
+  };
+
+  const handleUpdateCompiledInsightsText = (text: string) => {
+    if (!vaultData) return;
+    saveVaultData({
+      ...vaultData,
+      compiledInsightsText: text,
+    });
+  };
+
   const handleUpdateActiveAccentColor = (color: string) => {
     if (!vaultData) return;
     saveVaultData({
@@ -1000,13 +1070,29 @@ export default function App() {
   const handleExportCSV = () => {
     if (!vaultData) return;
     const rawData = generateCSVData(vaultData);
-    downloadBlob(rawData, 'Echelon_Treasury_Manual_Export.csv', 'text/csv');
+    try {
+      downloadBlob(rawData, 'Echelon_Treasury_Manual_Export.csv', 'text/csv');
+    } catch (e) {
+      console.warn('Traditional download failed', e);
+    }
+    setDownloadModalTitle('Portfolio Spreadsheet Statement (CSV)');
+    setDownloadModalFilename('Echelon_Treasury_Manual_Export.csv');
+    setDownloadModalContent(rawData);
+    setDownloadModalOpen(true);
   };
 
   const handleExportPDF = () => {
     if (!vaultData) return;
     const htmlReport = generateHTMLReport(vaultData);
-    downloadBlob(htmlReport, 'Echelon_Treasury_Manual_Assessment_Report.html', 'text/html');
+    try {
+      downloadBlob(htmlReport, 'Echelon_Treasury_Manual_Assessment_Report.html', 'text/html');
+    } catch (e) {
+      console.warn('Traditional download failed', e);
+    }
+    setDownloadModalTitle('Printable Assessment Report (HTML/PDF)');
+    setDownloadModalFilename('Echelon_Treasury_Manual_Assessment_Report.html');
+    setDownloadModalContent(htmlReport);
+    setDownloadModalOpen(true);
   };
 
   // If locked or no pin set, render the secure Pin code locker screen
@@ -1285,6 +1371,8 @@ export default function App() {
               onRemoveAsset={handleRemoveAsset}
               currencySymbol={vaultData.currencySymbol || '₹'}
               onOpenSettings={() => setShowSettings(true)}
+              transfers={vaultData.transfers || []}
+              onAddTransfer={handleCreateTransfer}
             />
           )}
 
@@ -1325,6 +1413,11 @@ export default function App() {
               customAlertRules={vaultData.customAlertRules || []}
               onOpenSettings={() => setShowSettings(true)}
               onUpdateCategoryLimits={handleUpdateCategoryLimits}
+              assets={vaultData.assets}
+              creditCards={vaultData.creditCards || []}
+              onAddOutflow={handleAddOutflow}
+              selectedProgressBarStyle={vaultData.selectedProgressBarStyle || 'ultra-thin'}
+              activeAccentColor={vaultData.activeAccentColor}
             />
           )}
 
@@ -1337,36 +1430,14 @@ export default function App() {
               expenses={vaultData.expenses}
               currencySymbol={vaultData.currencySymbol || '₹'}
               goals={vaultData.goals}
+              compiledInsightsText={vaultData.compiledInsightsText}
+              onUpdateCompiledInsightsText={handleUpdateCompiledInsightsText}
             />
           )}
 
         </div>
 
       </main>
-
-
-
-      {/* FLOATING ACTION UNDO TOAST ALERT */}
-      {lastActionMessage && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
-          <div className="bg-zinc-950/95 border border-amber-500/30 text-stone-200 rounded-xl px-4 py-3 shadow-2xl flex items-center justify-between gap-4 backdrop-blur-md">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-              <span>{lastActionMessage}</span>
-            </div>
-            {undoStack.length > 0 && !lastActionMessage.includes('Reverted') && (
-              <button
-                type="button"
-                onClick={handleUndo}
-                className="text-[10px] bg-amber-500 hover:bg-amber-400 text-zinc-950 px-2.5 py-1 rounded-lg font-black flex items-center gap-1 transition-all uppercase tracking-wider active:scale-95"
-              >
-                <RotateCcw className="h-3 w-3 animate-spin duration-1000" />
-                <span>Undo</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* SECURE HIGH-CONTRAST BOTTOM NAVIGATION TASKBAR */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-stone-800/80 px-2 py-3 flex items-center justify-around max-w-lg mx-auto sm:rounded-t-3xl sm:border shadow-2xl">
@@ -1504,6 +1575,37 @@ export default function App() {
                     className="w-full max-w-md px-3.5 py-2 bg-stone-950 border border-stone-800 text-sm text-stone-200 rounded-xl focus:border-amber-500/50 outline-none transition-all font-semibold"
                   />
                   <p className="text-[10px] text-stone-500 italic">This name matches dynamically printed PDF assets allocations logs.</p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-stone-850/40">
+                  <label className="text-xs font-bold text-stone-300 block">Security Auto-Lock Timeout</label>
+                  <p className="text-[10px] text-stone-500 mb-2">Configure how long Echelon can remain idle or in the background before locking and protecting your private ledger data.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { minutes: 0, label: 'Never Lock' },
+                      { minutes: 1, label: '1 min' },
+                      { minutes: 5, label: '5 min' },
+                      { minutes: 15, label: '15 min' },
+                      { minutes: 30, label: '30 min' },
+                      { minutes: 60, label: '1 hour' },
+                    ].map((opt) => {
+                      const isSel = (vaultData.securityTimeoutMinutes !== undefined ? vaultData.securityTimeoutMinutes : 30) === opt.minutes;
+                      return (
+                        <button
+                          key={`lock-opt-${opt.minutes}`}
+                          type="button"
+                          onClick={() => handleUpdateSecurityTimeoutMinutes(opt.minutes)}
+                          className={`px-3 py-1.5 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider flex items-center justify-center border transition-all ${
+                            isSel 
+                              ? 'border-amber-500 bg-amber-500/15 text-amber-400 font-extrabold' 
+                              : 'border-stone-800 hover:bg-stone-800 text-stone-400'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-2 pt-2 border-t border-stone-850/40">
@@ -2277,7 +2379,16 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           const stateCopy = { ...vaultData };
-                          downloadBlob(JSON.stringify(stateCopy, null, 2), 'Echelon_Protected_Manual_Restore.json', 'application/json');
+                          const jsonStr = JSON.stringify(stateCopy, null, 2);
+                          try {
+                            downloadBlob(jsonStr, 'Echelon_Protected_Manual_Restore.json', 'application/json');
+                          } catch (e) {
+                            console.warn('Traditional download failed', e);
+                          }
+                          setDownloadModalTitle('Protected Manual Restore (JSON)');
+                          setDownloadModalFilename('Echelon_Protected_Manual_Restore.json');
+                          setDownloadModalContent(jsonStr);
+                          setDownloadModalOpen(true);
                         }}
                         className="px-3 py-1.5 w-full bg-zinc-850 hover:bg-zinc-805 text-stone-300 font-medium text-xs rounded-lg border border-stone-800 transition-all"
                       >
@@ -2415,6 +2526,63 @@ export default function App() {
           </button>
         </p>
       </footer>
+
+      {/* UNIVERSAL BACKUP AND STATEMENT DOWNLOAD HELPER MODAL */}
+      {downloadModalOpen && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-stone-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-zinc-900 border border-stone-850 rounded-3xl p-6 space-y-4 shadow-2xl text-stone-100 max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-mono font-bold text-amber-500 tracking-wider">🔒 System Diagnostic Export Fallback</span>
+                <h3 className="text-base font-bold text-white mt-0.5">{downloadModalTitle}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDownloadModalOpen(false)}
+                className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-750 text-stone-300 hover:text-white rounded-lg text-xs font-semibold tracking-wider transition-all"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-amber-500/5 border border-amber-500/10 rounded-xl text-xs space-y-1.5 leading-relaxed">
+              <p className="text-stone-300">
+                <strong>Device Sandbox Download Protection:</strong> In some sandbox wrapper or mobile environments, traditional file downloads are restricted to prevent data leakage.
+              </p>
+              <div className="text-[10.5px] text-stone-400 space-y-1">
+                <p>• <strong>To Save manually:</strong> Copy the text block below and paste it in a local file named <strong className="text-amber-500">{downloadModalFilename}</strong>.</p>
+                <p>• <strong>For accounting:</strong> CSV/HTML can be loaded directly inside Excel, Google Sheets, or any browser tab offline.</p>
+                <p>• <strong>Restore:</strong> If you lose your session, upload this JSON file on the same backups page to restore your confidential ledger.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-mono font-semibold text-zinc-500">File Reference: {downloadModalFilename}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(downloadModalContent);
+                  setCopyFeedbackActive(true);
+                  setTimeout(() => setCopyFeedbackActive(false), 2000);
+                }}
+                className={`py-1.5 px-4 font-black rounded-lg text-xs transition-all uppercase tracking-wide flex items-center justify-center gap-1.5 ${
+                  copyFeedbackActive
+                    ? 'bg-emerald-500 text-stone-950'
+                    : 'bg-amber-500 hover:bg-amber-400 text-zinc-950 active:scale-95'
+                }`}
+              >
+                <span>{copyFeedbackActive ? '✓ Copied to Clipboard' : '📋 Copy Ledger Text'}</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-[#050505]/85 border border-stone-850 p-3 rounded-xl">
+              <pre className="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-all">
+                {downloadModalContent}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

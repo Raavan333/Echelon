@@ -31,6 +31,8 @@ interface AIInsightsProps {
   expenses: Expense[];
   currencySymbol?: string;
   goals?: FinancialGoal[];
+  compiledInsightsText?: string;
+  onUpdateCompiledInsightsText?: (text: string) => void;
 }
 
 export default function AIInsights({
@@ -41,13 +43,21 @@ export default function AIInsights({
   expenses,
   currencySymbol = '₹',
   goals = [],
+  compiledInsightsText = '',
+  onUpdateCompiledInsightsText,
 }: AIInsightsProps) {
-  const [cloudInsights, setCloudInsights] = useState<string>('');
+  const [cloudInsights, setCloudInsights] = useState<string>(() => compiledInsightsText || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [score, setScore] = useState<number>(65);
   const [simulatedRepay, setSimulatedRepay] = useState<boolean>(false);
   const [simulatedDivert, setSimulatedDivert] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (compiledInsightsText) {
+      setCloudInsights(compiledInsightsText);
+    }
+  }, [compiledInsightsText]);
 
   const tokens = getColorTokens(theme);
 
@@ -137,21 +147,47 @@ export default function AIInsights({
   const rank = getRank(score);
 
   // 2. OFFLINE SOVEREIGN COGNITIVE INTEL REPORT GENERATION (CLIENT DEVICE CONTAINED)
-  const fetchGeminiInsights = () => {
+  const fetchGeminiInsights = async () => {
     setLoading(true);
     setError('');
     
-    // Simulate safe calculation cycles for user feedback satisfaction
-    setTimeout(() => {
-      try {
-        setCloudInsights('compiled');
-      } catch (err: any) {
-        console.error(err);
-        setError('Local compiler computation error. Re-verify balance sheets allocations.');
-      } finally {
-        setLoading(false);
+    try {
+      const response = await fetch('/api/insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assets,
+          loans,
+          monthlyEarnings,
+          expenses,
+          blendedAPY,
+          emergencyShieldMonths,
+          score,
+          rank: rank.title,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cloud compile failed at database gateway levels (status: ${response.status})`);
       }
-    }, 750);
+
+      const data = await response.json();
+      if (data.insights) {
+        if (onUpdateCompiledInsightsText) {
+          onUpdateCompiledInsightsText(data.insights);
+        }
+        setCloudInsights(data.insights);
+      } else {
+        throw new Error('Incomplete data response from secure sovereign server.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Local compiler computation error. Re-verify balance sheets allocations.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -323,6 +359,64 @@ export default function AIInsights({
                     Liquid cash: {currencySymbol}{displayLiquidCash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
+              </div>
+              
+              {/* Sovereign Real-Time AI Dossier Advice */}
+              <div className="p-5 rounded-2xl bg-[#09090b]/80 border border-amber-500/10 space-y-3 shadow-xl">
+                <div className="flex items-center gap-2 pb-2 border-b border-stone-850/50">
+                  <Cpu className="h-4 w-4 text-amber-500" />
+                  <span className="text-[10px] uppercase font-mono font-bold text-stone-350">🏛️ Sovereign AI Advisory Dossier (Real-Time Synthesis)</span>
+                </div>
+                {cloudInsights === 'compiled' ? (
+                  <div className="space-y-2 text-stone-400 text-xs">
+                    <p>Intel report compiles complete calculations. In offline containment fallback mode, please configure your <strong className="text-stone-300 font-mono">GEMINI_API_KEY</strong> in Settings to receive deep natural language strategy dockets personalized for your portfolio.</p>
+                  </div>
+                ) : (
+                  <SimpleMarkdownRenderer text={cloudInsights} />
+                )}
+              </div>
+              
+              {/* Sovereign Quick Audit Bullets */}
+              <div className="p-4 rounded-2xl bg-amber-500/[0.02] border border-amber-500/15 space-y-2 text-xs">
+                <span className="text-[10px] uppercase font-mono font-bold text-amber-500 block">🏛️ Autonomous Sovereign Audit (Scannable Outcomes)</span>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-1 font-sans text-stone-300">
+                  <li className="flex items-start gap-2 leading-snug">
+                    <span className="text-emerald-400 font-bold font-mono">✔</span>
+                    <div>
+                      <strong>Compounding Yield:</strong> Net APY stands stably at <strong className="text-emerald-400">{blendedAPY.toFixed(2)}%</strong> with zero leakage.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-2 leading-snug">
+                    {emergencyShieldMonths >= 6 ? (
+                      <span className="text-emerald-400 font-bold font-mono">✔</span>
+                    ) : (
+                      <span className="text-amber-500 font-bold font-mono">⚠</span>
+                    )}
+                    <div>
+                      <strong>Reserve Safety Buffer:</strong> Shield covers <strong className={`${emergencyShieldMonths >= 6 ? 'text-emerald-400' : 'text-amber-400'}`}>{emergencyShieldMonths.toFixed(1)} months</strong> of dynamic term spends.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-2 leading-snug">
+                    {highInterestDebts.length === 0 || simulatedRepay ? (
+                      <span className="text-emerald-400 font-bold font-mono">✔</span>
+                    ) : (
+                      <span className="text-rose-400 font-bold font-mono">⚠</span>
+                    )}
+                    <div>
+                      <strong>Systemic Debt Drag:</strong> <strong className={`${highInterestDebts.length > 0 && !simulatedRepay ? 'text-rose-450 text-rose-400' : 'text-emerald-400'}`}>{highInterestDebts.length > 0 && !simulatedRepay ? `${highInterestDebts.length} active high-rate leaks` : '0 leaks active'}</strong>.
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-2 leading-snug">
+                    {rates.netPerMonth > 0 ? (
+                      <span className="text-emerald-400 font-bold font-mono">✔</span>
+                    ) : (
+                      <span className="text-rose-400 font-bold font-mono">⚠</span>
+                    )}
+                    <div>
+                      <strong>Accumulation Velocity:</strong> Net surplus of <strong className="text-emerald-400">+{currencySymbol}{rates.netPerMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}/mo</strong>.
+                    </div>
+                  </li>
+                </ul>
               </div>
 
               {/* Directives Playbook */}
@@ -551,4 +645,103 @@ export default function AIInsights({
 
     </div>
   );
+}
+
+function SimpleMarkdownRenderer({ text }: { text: string }) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-2 text-stone-200 text-xs font-sans leading-relaxed">
+      {lines.map((line, idx) => {
+        let trimmed = line.trim();
+        
+        // Headers
+        if (trimmed.startsWith('### ')) {
+          return <h4 key={idx} className="text-xs font-mono font-bold text-amber-500 uppercase tracking-widest pt-3 pb-1 border-b border-stone-850/40">{trimmed.slice(4)}</h4>;
+        }
+        if (trimmed.startsWith('## ')) {
+          return <h3 key={idx} className="text-sm font-display font-medium text-amber-450 text-amber-400 pt-4 pb-1 border-b border-stone-805/45">{trimmed.slice(3)}</h3>;
+        }
+        if (trimmed.startsWith('# ')) {
+          return <h2 key={idx} className="text-base font-display font-black text-amber-450 pt-4 pb-2 border-b-2 border-stone-805/45">{trimmed.slice(2)}</h2>;
+        }
+
+        // List items
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+          const content = trimmed.slice(2);
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2">
+              <span className="text-amber-500 font-mono select-none">•</span>
+              <p className="flex-1">{parseInlineMarkdown(content)}</p>
+            </div>
+          );
+        }
+
+        if (trimmed.match(/^\d+\.\s/)) {
+          const content = trimmed.replace(/^\d+\.\s/, '');
+          const match = trimmed.match(/^(\d+)\.\s/);
+          const num = match ? match[1] : '';
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2 font-medium">
+              <span className="text-amber-500 font-mono select-none">{num}.</span>
+              <p className="flex-1">{parseInlineMarkdown(content)}</p>
+            </div>
+          );
+        }
+
+        // Empty line
+        if (!trimmed) return <div key={idx} className="h-2" />;
+
+        // Fallback paragraph
+        return <p key={idx} className="text-stone-300">{parseInlineMarkdown(trimmed)}</p>;
+      })}
+    </div>
+  );
+}
+
+function parseInlineMarkdown(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let currentText = text;
+  let key = 0;
+
+  while (currentText.length > 0) {
+    const boldStart = currentText.indexOf('**');
+    const codeStart = currentText.indexOf('`');
+
+    if (boldStart === -1 && codeStart === -1) {
+      parts.push(<span key={key++}>{currentText}</span>);
+      break;
+    }
+
+    if (boldStart !== -1 && (codeStart === -1 || boldStart < codeStart)) {
+      if (boldStart > 0) {
+        parts.push(<span key={key++}>{currentText.substring(0, boldStart)}</span>);
+      }
+      currentText = currentText.substring(boldStart + 2);
+      const boldEnd = currentText.indexOf('**');
+      if (boldEnd !== -1) {
+        parts.push(<strong key={key++} className="font-extrabold text-[#ffffff]">{currentText.substring(0, boldEnd)}</strong>);
+        currentText = currentText.substring(boldEnd + 2);
+      } else {
+        parts.push(<span key={key++}>**{currentText}</span>);
+        break;
+      }
+    } else if (codeStart !== -1) {
+      if (codeStart > 0) {
+        parts.push(<span key={key++}>{currentText.substring(0, codeStart)}</span>);
+      }
+      currentText = currentText.substring(codeStart + 1);
+      const codeEnd = currentText.indexOf('`');
+      if (codeEnd !== -1) {
+        parts.push(<code key={key++} className="px-1.5 py-0.5 bg-stone-900 border border-stone-800 text-[10px] text-amber-400 font-mono rounded">{currentText.substring(0, codeEnd)}</code>);
+        currentText = currentText.substring(codeEnd + 1);
+      } else {
+        parts.push(<span key={key++}>`{currentText}</span>);
+        break;
+      }
+    }
+  }
+
+  return parts;
 }

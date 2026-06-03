@@ -176,6 +176,24 @@ export interface EchelonState {
   selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
   slideshowEnabled?: boolean;
   slideshowIntervalSeconds?: number;
+  transfers?: FundTransfer[];
+  securityTimeoutMinutes?: number;
+  compiledInsightsText?: string;
+}
+
+export interface FundTransfer {
+  id: string;
+  sourceAssetId: string;
+  sourceAssetName: string;
+  destinationAssetId: string;
+  destinationAssetName: string;
+  baseAmount: number;
+  gainAmount: number;       // Profit added (e.g. Stock gain)
+  penaltyAmount: number;    // Penalty subtracted (e.g. FD/Bond break fee)
+  netAmountTransferred: number;
+  notes: string;
+  date: string;
+  type: 'STOCK_PROFIT' | 'FD_PENALTY' | 'BOND_PENALTY' | 'NEUTRAL_TRANSFER';
 }
 
 export interface AlertRule {

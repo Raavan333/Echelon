@@ -56,16 +56,22 @@ export default function BudgetManager({
 
   const bankAccounts = assets.filter(a => a.type === 'BANK_BALANCE');
 
-  // Set default sourceId on mount or if assets/cards shift
+  // Set default sourceId on mount or if assets/cards shift, preserving existing valid selections
   React.useEffect(() => {
     if (sourceType === 'bank_balance') {
-      const firstBank = bankAccounts[0];
-      setSourceId(firstBank ? firstBank.id : '');
+      const exists = bankAccounts.some(a => a.id === sourceId);
+      if (!exists) {
+        const firstBank = bankAccounts[0];
+        setSourceId(firstBank ? firstBank.id : '');
+      }
     } else {
-      const firstCard = creditCards[0];
-      setSourceId(firstCard ? firstCard.id : '');
+      const exists = creditCards.some(c => c.id === sourceId);
+      if (!exists) {
+        const firstCard = creditCards[0];
+        setSourceId(firstCard ? firstCard.id : '');
+      }
     }
-  }, [sourceType, assets, creditCards]);
+  }, [sourceType, assets, creditCards, sourceId]);
 
   // Default fallback categories
   const DEFAULT_CATEGORIES: BudgetCategoryLimit[] = [
@@ -164,40 +170,34 @@ export default function BudgetManager({
 
   // Perform Month End Closeoff with auto PDF & CSV Download!
   const handleMonthEndVaultReset = () => {
-    setMonthEndProgress(true);
+    // 1. Generate & trigger Excel/CSV download
+    const stateObj = {
+      version: 1,
+      isLocked: false,
+      pinHash: '',
+      assets: [], // parent state will contain this info
+      loans: [],
+      goals: [],
+      budget: budget,
+      expenses: expenses,
+      monthlyEarnings: 120000,
+      theme: theme,
+      archivedReportMonths: []
+    };
     
-    // Simulate generation delays to build dramatic "securing vault" feedback
-    setTimeout(() => {
-      // 1. Generate & trigger Excel/CSV download
-      const stateObj = {
-        version: 1,
-        isLocked: false,
-        pinHash: '',
-        assets: [], // parent state will contain this info
-        loans: [],
-        goals: [],
-        budget: budget,
-        expenses: expenses,
-        monthlyEarnings: 120000,
-        theme: theme,
-        archivedReportMonths: []
-      };
-      
-      // Let's print out what is passed on
-      const csvStr = generateCSVData(stateObj as any);
-      downloadBlob(csvStr, `Echelon_Vault_Reset_Archive_${new Date().getFullYear()}_${new Date().getMonth() + 1}.csv`, 'text/csv');
-      
-      // 2. Generate PDF format report
-      const htmlStr = generateHTMLReport(stateObj as any, `Ledger Close-off Report`);
-      downloadBlob(htmlStr, `Echelon_Vault_Reset_Report_${new Date().getFullYear()}_${new Date().getMonth() + 1}.html`, 'text/html');
+    // Let's print out what is passed on
+    const csvStr = generateCSVData(stateObj as any);
+    downloadBlob(csvStr, `Echelon_Vault_Reset_Archive_${new Date().getFullYear()}_${new Date().getMonth() + 1}.csv`, 'text/csv');
+    
+    // 2. Generate PDF format report
+    const htmlStr = generateHTMLReport(stateObj as any, `Ledger Close-off Report`);
+    downloadBlob(htmlStr, `Echelon_Vault_Reset_Report_${new Date().getFullYear()}_${new Date().getMonth() + 1}.html`, 'text/html');
 
-      // 3. Trigger parent reset
-      onTriggerMonthEndReset();
+    // 3. Trigger parent reset
+    onTriggerMonthEndReset();
 
-      setMonthEndProgress(false);
-      setSuccessReset(true);
-      setTimeout(() => setSuccessReset(false), 5000);
-    }, 2000);
+    setSuccessReset(true);
+    setTimeout(() => setSuccessReset(false), 5000);
   };
 
   const handleStartEditCategory = (index: number, cat: BudgetCategoryLimit) => {
