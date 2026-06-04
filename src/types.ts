@@ -9,6 +9,7 @@ export enum AssetType {
   BOND = 'BOND',
   STOCK = 'STOCK',
   BANK_BALANCE = 'BANK_BALANCE',
+  CASH_CARRY = 'CASH_CARRY',
 }
 
 export enum LoanType {
@@ -107,6 +108,12 @@ export interface CustomThemeConfig {
   name: string;
   primaryColor: string; // Custom Hex accent color code
   bgMode: 'dark' | 'light';
+  backgroundColor?: string;
+  textColor?: string;
+  accentColor?: string;
+  buttonBgColor?: string;
+  buttonTextColor?: string;
+  fontStyle?: 'classic-inter' | 'cyber-mono' | 'serif-editorial';
 }
 
 export interface CreditCard {
@@ -130,7 +137,7 @@ export interface OutflowLog {
   amount: number;
   category: string;
   date: string; // ISO Date string
-  sourceType: 'bank_balance' | 'credit_card';
+  sourceType: 'bank_balance' | 'credit_card' | 'cash_carry';
   sourceId: string; // Asset ID or CreditCard ID
   sourceName: string;
   amountLeftAfter: number; // Balance left in bank or CC remaining limit
@@ -144,11 +151,14 @@ export interface AcknowledgedAlertRecord {
   ruleName: string;
   message: string;
   date: string; // ISO date of ack
+  linkedFundName?: string;
+  closingBalance?: number;
 }
 
 export interface EchelonState {
   version: number;
   isLocked: boolean;
+  isOnboarded?: boolean;
   pinHash: string; // PIN hashed/salted for decryption check
   assets: Asset[];
   loans: Loan[];
@@ -176,9 +186,12 @@ export interface EchelonState {
   selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
   slideshowEnabled?: boolean;
   slideshowIntervalSeconds?: number;
+  slideshowThemeKeys?: string[];
   transfers?: FundTransfer[];
   securityTimeoutMinutes?: number;
   compiledInsightsText?: string;
+  taggedBufferAssetId?: string;
+  taggedBufferAssetIds?: string[];
 }
 
 export interface FundTransfer {
@@ -193,7 +206,9 @@ export interface FundTransfer {
   netAmountTransferred: number;
   notes: string;
   date: string;
-  type: 'STOCK_PROFIT' | 'FD_PENALTY' | 'BOND_PENALTY' | 'NEUTRAL_TRANSFER';
+  type: 'STOCK_PROFIT' | 'FD_PENALTY' | 'BOND_PENALTY' | 'NEUTRAL_TRANSFER' | 'CASH_WITHDRAWAL' | 'CC_TO_BANK_TRANSFER';
+  ccPlatformName?: string;
+  ccServiceFee?: number;
 }
 
 export interface AlertRule {

@@ -17,7 +17,8 @@ import {
   History, 
   TrendingUp, 
   AlertTriangle, 
-  Calendar 
+  Calendar,
+  Wallet
 } from 'lucide-react';
 import { EchelonTheme, Asset, AssetType, FundTransfer } from '../types';
 import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
@@ -181,6 +182,7 @@ export default function AssetManager({
       case AssetType.BOND: setAnnualGrowthRate('8.5'); break;
       case AssetType.STOCK: setAnnualGrowthRate('12'); break;
       case AssetType.BANK_BALANCE: setAnnualGrowthRate('3.5'); break;
+      case AssetType.CASH_CARRY: setAnnualGrowthRate('0'); break;
     }
   };
 
@@ -237,6 +239,7 @@ export default function AssetManager({
       case AssetType.EQUITY: return <BarChart className="h-5 w-5 text-blue-500" />;
       case AssetType.STOCK: return <BarChart className="h-5 w-5 text-purple-500" />;
       case AssetType.BANK_BALANCE: return <Landmark className="h-5 w-5 text-cyan-500" />;
+      case AssetType.CASH_CARRY: return <Wallet className="h-5 w-5 text-amber-500" />;
       default: return <CircleDollarSign className="h-5 w-5 text-stone-500" />;
     }
   };
@@ -248,6 +251,7 @@ export default function AssetManager({
       case AssetType.EQUITY: return 'Equity Mutual Funds';
       case AssetType.STOCK: return 'Delivery Stocks';
       case AssetType.BANK_BALANCE: return 'Savings/Bank Balance';
+      case AssetType.CASH_CARRY: return 'Cash/Physical Wallet';
       default: return 'Asset';
     }
   };
@@ -354,6 +358,7 @@ export default function AssetManager({
                 <option value={AssetType.BOND}>Corporate Bond</option>
                 <option value={AssetType.STOCK}>Delivery Stocks</option>
                 <option value={AssetType.BANK_BALANCE}>Savings/Bank Balance</option>
+                <option value={AssetType.CASH_CARRY}>Cash Wallet / Physical Cash</option>
               </select>
             </div>
 

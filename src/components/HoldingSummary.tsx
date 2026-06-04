@@ -42,6 +42,10 @@ interface HoldingSummaryProps {
   onUpdateCustomSavingsGoalAmt?: (val: number) => void;
   onOpenSettings?: (tab?: string) => any;
   budgetAmount?: number;
+  taggedBufferAssetId?: string;
+  onUpdateTaggedBufferAsset?: (id: string) => void;
+  taggedBufferAssetIds?: string[];
+  onUpdateTaggedBufferAssets?: (ids: string[]) => void;
 }
 
 type PeriodType = 'hour' | 'day' | 'month' | 'year' | '5year';
@@ -60,10 +64,18 @@ export default function HoldingSummary({
   onUpdateCustomSavingsGoalAmt,
   onOpenSettings,
   budgetAmount = 0,
+  taggedBufferAssetId,
+  onUpdateTaggedBufferAsset,
+  taggedBufferAssetIds = [],
+  onUpdateTaggedBufferAssets,
 }: HoldingSummaryProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [forecastYears, setForecastYears] = useState<number>(3);
   const [liveNetOffset, setLiveNetOffset] = useState<number>(0);
+
+   const activeTaggedIds = taggedBufferAssetIds && taggedBufferAssetIds.length > 0
+    ? taggedBufferAssetIds
+    : (taggedBufferAssetId ? [taggedBufferAssetId] : []);
 
   const tokens = getColorTokens(theme);
 
@@ -301,93 +313,189 @@ export default function HoldingSummary({
 
       {/* 2. VELOCITY CONTROLLERS AND CASH LOG VELOCITY */}
       <div className={`p-6 rounded-3xl border ${tokens.card} ${tokens.glow} flex flex-col justify-between transition-all duration-300`}>
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs uppercase font-bold tracking-widest text-amber-500 font-mono">Treasury Velocity</span>
-            <span className="text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
-              {rates.earningsRatePercentOfYear >= 0 ? '+' : ''}{rates.earningsRatePercentOfYear.toFixed(1)}% APY
-            </span>
+        <div className="space-y-5">
+          {/* div:nth-of-type(1) - Header */}
+          <div className="flex items-center justify-between border-b border-dashed border-stone-800/40 pb-2.5">
+            <div>
+              <span className="text-xs uppercase font-extrabold tracking-widest text-amber-500 font-mono block">Echelon Velocity Profiler</span>
+              <p className="text-[10px] text-stone-500">Decisive metrics representing reserve shield velocity</p>
+            </div>
+            <button
+              onClick={() => {
+                if (onOpenSettings) onOpenSettings('rules');
+              }}
+              className="text-[10px] font-mono bg-amber-500/10 border border-amber-500/20 text-amber-500 px-2.5 py-0.5 rounded uppercase font-black hover:bg-amber-500 hover:text-stone-950 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span>⚙ Configure</span>
+            </button>
           </div>
 
-          {/* Selection pills */}
-          <div className="grid grid-cols-5 gap-1 bg-stone-500/10 p-1 rounded-xl mb-6">
-            {(['hour', 'day', 'month', 'year', '5year'] as PeriodType[]).map((period) => (
-              <button
-                key={period}
-                type="button"
-                id={`velocity-tab-${period}`}
-                onClick={() => setSelectedPeriod(period)}
-                className={`text-[9px] font-bold uppercase py-1.5 rounded-lg transition-all ${
-                  selectedPeriod === period 
-                    ? 'bg-amber-500 text-stone-950 font-extrabold' 
-                    : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                {period === '5year' ? '5 Yr' : period}
-              </button>
-            ))}
-          </div>
-
-          {/* Flow details Display */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between text-xs text-stone-500 font-mono mb-1">
-                <span>TOTAL INCOME INFLOW</span>
-                <span className="text-emerald-500 font-semibold">Inflow Stream</span>
+          {/* div:nth-of-type(2) - Parameters Display */}
+          <div className="space-y-3 bg-stone-500/[0.02] border border-stone-850 p-3.5 rounded-2xl flex flex-col justify-between">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+                  Salary Inflow
+                </span>
+                <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
+                  {currencySymbol}{monthlyEarnings.toLocaleString('en-IN')}
+                </p>
               </div>
-              <p className={`text-2xl font-bold font-mono ${tokens.textPrimary}`}>
-                +{currencySymbol}{activePeriod.earnings.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-              </p>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between text-xs text-stone-500 font-mono mb-1">
-                <span>TOTAL EXPENSES/OUTFLOW</span>
-                <span className="text-red-500 font-semibold">Sinks Stream</span>
-              </div>
-              <p className={`text-2xl font-bold font-mono ${tokens.textPrimary}`}>
-                -{currencySymbol}{activePeriod.losses.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-              </p>
-            </div>
-
-            <div className="pt-3 border-t border-dashed border-stone-800/15 dark:border-stone-100/10">
-              <div className="flex items-center justify-between text-xs text-stone-500 font-mono mb-1">
-                <span>NET QUIET ACCUMULATION</span>
-                <span className={`flex items-center gap-0.5 font-bold ${activePeriod.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {activePeriod.net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                  {activePeriod.net >= 0 ? 'Surplus' : 'Deficit'}
+              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+                  Outflow/Sinks
+                </span>
+                <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
+                  {currencySymbol}{(userOverriddenExpenses ?? 15000).toLocaleString('en-IN')}
+                </p>
+                <span className="text-[7px] text-stone-550 block font-mono">
+                  {userOverriddenExpenses === undefined ? 'Dynamic' : 'Static'}
                 </span>
               </div>
-              <p className={`text-3xl font-extrabold font-mono ${activePeriod.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                {currencySymbol}{activePeriod.net.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-              </p>
+
+              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+                  Buffer Target
+                </span>
+                <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
+                  {currencySymbol}{(customSavingsGoalAmt ?? 5000).toLocaleString('en-IN')}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* 3. CASH-INJECTS/SALARY CONFIGURATION */}
-        <div className="mt-6 pt-4 border-t border-stone-800/10 dark:border-stone-100/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Monthly Cash Influx</span>
-              <p className={`text-sm font-bold font-mono ${tokens.textPrimary}`}>
-                {currencySymbol}{monthlyEarnings.toLocaleString('en-IN')} /mo
-              </p>
-            </div>
-            
-            {onOpenSettings && (
+          {/* div:nth-of-type(3) - Buffer Asset Indicator */}
+          <div className="space-y-1.5">
+            <span className="text-[9px] uppercase font-mono font-bold text-stone-400 block flex justify-between items-center">
+              <span>🛡️ Anchored Safety Shield</span>
               <button
-                type="button"
-                id="edit-earnings-btn"
-                onClick={() => onOpenSettings('rules')}
-                className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 font-mono px-2 py-1 rounded hover:bg-amber-500/20 active:scale-95 transition-all"
+                onClick={() => { if (onOpenSettings) onOpenSettings('rules'); }}
+                className="text-[8.5px] text-amber-500 hover:underline font-mono"
               >
-                Configure
+                Change Link
               </button>
-            )}
+            </span>
+            <div className="bg-stone-950 p-3 rounded-xl border border-stone-850 flex items-center justify-between">
+              {(() => {
+                const taggedAsset = assets.find(a => activeTaggedIds.includes(a.id));
+                if (taggedAsset) {
+                  return (
+                    <div className="flex items-center justify-between w-full font-mono text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                        <span className="font-semibold text-stone-200 truncate">{taggedAsset.name}</span>
+                      </div>
+                      <span className="font-extrabold text-amber-500 pl-1">
+                        {currencySymbol}{Math.floor(taggedAsset.currentValue).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="text-[10px] italic text-rose-400 font-sans flex items-center justify-center gap-1 w-full py-1 text-center">
+                      <span>⚠ Portfolio Treasury Exposed (No Active Anchor)</span>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
           </div>
-        </div>
 
+          {/* div:nth-of-type(4) - Calculated Buffer Status Metrics */}
+          {(() => {
+            const selectedAssets = assets.filter(a => activeTaggedIds.includes(a.id));
+            const totalTaggedVal = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+            const bufferGoalAmt = customSavingsGoalAmt ?? 5000;
+            const bufferPct = bufferGoalAmt > 0 ? Math.min(100, (totalTaggedVal / bufferGoalAmt) * 100) : 0;
+            
+            const netSavedPerMonth = monthlyEarnings - (userOverriddenExpenses ?? 15000);
+            const savingVelocity = netSavedPerMonth * (bufferPct / 100);
+
+            return (
+              <div className="space-y-4 pt-2.5 border-t border-dashed border-stone-800/60 text-stone-300">
+                {/* div:nth-of-type(1) - Progress Section */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-1.5">
+                    <span>SHIELD PROTECTIVE GAP</span>
+                    {selectedAssets.length > 0 ? (
+                      <span className={`font-bold ${bufferPct === 100 ? 'text-emerald-400' : 'text-amber-500'}`}>
+                        {bufferPct.toFixed(0)}% Shielded
+                      </span>
+                    ) : (
+                      <span className="text-red-400 font-bold">Exposed Margin</span>
+                    )}
+                  </div>
+
+                  {selectedAssets.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-stone-400 bg-stone-900/30 px-2 py-1.5 rounded-lg border border-stone-850/60">
+                        <span className="font-semibold truncate max-w-[140px]">{selectedAssets[0]?.name}</span>
+                        <span>
+                          {currencySymbol}{Math.floor(totalTaggedVal).toLocaleString('en-IN')} / {currencySymbol}{bufferGoalAmt.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      
+                      {/* Interactive Visual Progress bar */}
+                      <div className="w-full bg-stone-900 h-1.5 rounded-full overflow-hidden border border-stone-800 shadow-inner">
+                        <div 
+                          className={`h-full transition-all duration-500 ${bufferPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          style={{ width: `${bufferPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] italic text-rose-400 font-sans bg-rose-500/5 p-2 rounded-xl border border-rose-500/10 text-center">
+                      No assets tagged yet. Open Settings to select an anchor shield asset.
+                    </p>
+                  )}
+                </div>
+
+                {/* div:nth-of-type(2) - Velocity Displays */}
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-dashed border-stone-850">
+                  <div>
+                    <span className="text-[9px] uppercase font-mono font-bold text-stone-500 block mb-0.5">
+                      Net Saved /mo
+                    </span>
+                    <p className={`text-base font-bold font-mono ${netSavedPerMonth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {netSavedPerMonth >= 0 ? '+' : ''}{currencySymbol}{Math.floor(netSavedPerMonth).toLocaleString('en-IN')}
+                    </p>
+                    <span className="text-[8px] text-stone-500 font-mono">(Salary - Outflow)</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] uppercase font-mono font-bold text-stone-400 block mb-0.5">
+                      Saving Velocity
+                    </span>
+                    <p className={`text-base font-extrabold font-mono transition-colors ${savingVelocity >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {savingVelocity >= 0 ? '+' : ''}{currencySymbol}{Math.floor(savingVelocity).toLocaleString('en-IN')} <span className="text-[10px] font-medium text-stone-500">/mo</span>
+                    </p>
+                    <span className="text-[8px] text-stone-500 font-mono flex items-center gap-0.5">
+                      (Net Saved × Shield)
+                    </span>
+                  </div>
+                </div>
+
+                {/* div:nth-of-type(3) - Warning Banner */}
+                <div className="text-[9.5px] leading-relaxed font-sans mt-2 rounded-xl p-3 bg-stone-900/50 border border-stone-850/60 text-stone-400 select-none">
+                  {bufferPct === 100 ? (
+                    <span className="text-emerald-400 font-medium whitespace-normal pb-0.5 block">
+                      ✓ Buffer Shield complete. No savings are diverted: Your saving velocity compounding potential is fully unlocked.
+                    </span>
+                  ) : bufferPct > 0 ? (
+                    <span className="text-amber-400 font-medium whitespace-normal pb-0.5 block">
+                      ⚠ Shield is only partially funded ({bufferPct.toFixed(0)}%). Compounding velocity is throttled because excess inflow is safely channeled to fortify the buffer.
+                    </span>
+                  ) : (
+                    <span className="text-stone-500 italic whitespace-normal pb-0.5 block">
+                      Aggregate velocity calculated by multiplying your Net Saved by the buffer met progression index. Protect your treasury.
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
 
       {/* 4. DONUT LEDGER DISTRIBUTION CHART */}

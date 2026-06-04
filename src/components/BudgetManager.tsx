@@ -16,7 +16,7 @@ interface BudgetManagerProps {
   budgetCategoryLimits?: BudgetCategoryLimit[];
   onConfigureBudget: (amount: number, period: BudgetPeriod, alertPercent: number) => void;
   onAddExpense: (expense: Omit<Expense, 'id'>) => void;
-  onAddOutflow?: (expenseData: { category: string; amount: number; date: string; notes: string }, source: { sourceType: 'bank_balance' | 'credit_card'; sourceId: string }) => void;
+  onAddOutflow?: (expenseData: { category: string; amount: number; date: string; notes: string }, source: { sourceType: 'bank_balance' | 'credit_card' | 'cash_carry'; sourceId: string }) => void;
   onUpdateExpense?: (id: string, expense: Omit<Expense, 'id'>) => void;
   onRemoveExpense: (id: string) => void;
   onTriggerMonthEndReset: () => void;
@@ -51,10 +51,11 @@ export default function BudgetManager({
   activeAccentColor,
 }: BudgetManagerProps) {
   const [showAddExpense, setShowAddExpense] = useState<boolean>(false);
-  const [sourceType, setSourceType] = useState<'bank_balance' | 'credit_card'>('bank_balance');
+  const [sourceType, setSourceType] = useState<'bank_balance' | 'credit_card' | 'cash_carry'>('bank_balance');
   const [sourceId, setSourceId] = useState<string>('');
 
   const bankAccounts = assets.filter(a => a.type === 'BANK_BALANCE');
+  const cashAccounts = assets.filter(a => a.type === 'CASH_CARRY');
 
   // Set default sourceId on mount or if assets/cards shift, preserving existing valid selections
   React.useEffect(() => {
@@ -63,6 +64,12 @@ export default function BudgetManager({
       if (!exists) {
         const firstBank = bankAccounts[0];
         setSourceId(firstBank ? firstBank.id : '');
+      }
+    } else if (sourceType === 'cash_carry') {
+      const exists = cashAccounts.some(a => a.id === sourceId);
+      if (!exists) {
+        const firstCash = cashAccounts[0];
+        setSourceId(firstCash ? firstCash.id : '');
       }
     } else {
       const exists = creditCards.some(c => c.id === sourceId);
@@ -583,11 +590,11 @@ export default function BudgetManager({
 
               <div>
                 <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Funding source </label>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setSourceType('bank_balance')}
-                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${
+                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
                       sourceType === 'bank_balance' 
                         ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
                         : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
@@ -598,13 +605,24 @@ export default function BudgetManager({
                   <button
                     type="button"
                     onClick={() => setSourceType('credit_card')}
-                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${
+                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
                       sourceType === 'credit_card' 
                         ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
                         : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
                     }`}
                   >
                     Credit Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('cash_carry')}
+                    className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
+                      sourceType === 'cash_carry' 
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
+                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                    }`}
+                  >
+                    Cash Wallet
                   </button>
                 </div>
               </div>
@@ -620,6 +638,12 @@ export default function BudgetManager({
                   <option value="" disabled>-- Select Anchor --</option>
                   {sourceType === 'bank_balance' ? (
                     bankAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({currencySymbol}{a.currentValue.toLocaleString()})
+                      </option>
+                    ))
+                  ) : sourceType === 'cash_carry' ? (
+                    cashAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} ({currencySymbol}{a.currentValue.toLocaleString()})
                       </option>

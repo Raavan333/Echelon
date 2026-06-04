@@ -23,7 +23,8 @@ import {
   Sliders,
   HelpCircle,
   Activity,
-  RotateCcw
+  RotateCcw,
+  Bell
 } from 'lucide-react';
 
 import { 
@@ -44,7 +45,8 @@ import {
   CreditCard,
   OutflowLog,
   AcknowledgedAlertRecord,
-  FundTransfer
+  FundTransfer,
+  CustomThemeConfig
 } from './types';
 
 // Child components
@@ -57,6 +59,7 @@ import { EchelonIcon } from './components/CoolIcons';
 import LoanCompounder from './components/LoanCompounder';
 import BudgetManager from './components/BudgetManager';
 import GoalMilestones from './components/GoalMilestones';
+import EchelonOnboardingScreen from './components/EchelonOnboardingScreen';
 
 // Utilities
 import { encryptData, decryptData, hashPin } from './utils/security';
@@ -68,8 +71,20 @@ import { generateCSVData, generateHTMLReport, downloadBlob } from './utils/expor
 const createInitialState = (): EchelonState => ({
   version: 2,
   isLocked: true,
+  isOnboarded: false,
   pinHash: '',
-  assets: [],
+  assets: [
+    {
+      id: 'asset-cash-wallet',
+      type: AssetType.CASH_CARRY,
+      name: 'Cash Wallet',
+      institution: 'Physical Cash',
+      currentValue: 0,
+      realisedReturns: 0,
+      annualGrowthRate: 0,
+      lastUpdated: new Date().toISOString()
+    }
+  ],
   loans: [],
   goals: [],
   budget: {
@@ -81,6 +96,7 @@ const createInitialState = (): EchelonState => ({
   },
   expenses: [],
   monthlyEarnings: 0,
+  customSavingsGoalAmt: 5000,
   theme: {
     mode: 'dark',
     palette: 'elegant-dark',
@@ -119,6 +135,10 @@ export default function App() {
   // Bottom Navigation state
   const [activeTab, setActiveTab] = useState<'portfolio' | 'assets' | 'loans' | 'budget' | 'ai'>('portfolio');
 
+  // Safeguards Notification Center state
+  const [sessionDismissedAlertIds, setSessionDismissedAlertIds] = useState<string[]>([]);
+  const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);
+
   // Settings Panel Overlay state
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<'profile' | 'themes' | 'rules' | 'backups' | 'credits'>('profile');
@@ -130,6 +150,12 @@ export default function App() {
   const [newThemeName, setNewThemeName] = useState<string>('');
   const [newThemeColor, setNewThemeColor] = useState<string>('#f59e0b');
   const [newThemeBgMode, setNewThemeBgMode] = useState<'dark' | 'light'>('dark');
+  const [newThemeBgColor, setNewThemeBgColor] = useState<string>('#08080a');
+  const [newThemeTextColor, setNewThemeTextColor] = useState<string>('#f3f0fa');
+  const [newThemeBtnBgColor, setNewThemeBtnBgColor] = useState<string>('#1c1917');
+  const [newThemeBtnTextColor, setNewThemeBtnTextColor] = useState<string>('#ffffff');
+  const [newThemeFontStyle, setNewThemeFontStyle] = useState<'classic-inter' | 'cyber-mono' | 'serif-editorial'>('cyber-mono');
+  const [themeModeTab, setThemeModeTab] = useState<'dark' | 'light'>('dark');
 
   // Interactive Alert Builder state
   const [newAlertName, setNewAlertName] = useState<string>('');
@@ -268,27 +294,33 @@ export default function App() {
     if (!vaultData || !vaultData.slideshowEnabled || isLocked) return;
 
     const intervalSec = vaultData.slideshowIntervalSeconds || 10;
-    const masterpiecePalettes = [
-      'stealth-gold',
-      'black-steel',
-      'royal-emerald',
-      'rose-amethyst',
-      'platinum-silver',
-      'slate-amber',
-      'elegant-dark',
-      'black',
-      'silver',
-      'blue'
-    ];
+    
+    // Rotate through custom checkbox list if any, otherwise default list of system themes
+    const activeMode = vaultData.theme.mode || 'dark';
+    const darkSystemKeys = ['stealth-gold', 'black-steel', 'royal-emerald', 'rose-amethyst', 'platinum-silver'];
+    const lightSystemKeys = ['skyblue', 'pure-light', 'sand-drift', 'lavender-blush', 'mint-fresh'];
+    
+    const selectedSlideshowThemes = (vaultData.slideshowThemeKeys && vaultData.slideshowThemeKeys.length > 0)
+      ? vaultData.slideshowThemeKeys
+      : (activeMode === 'light' ? lightSystemKeys : darkSystemKeys);
 
     const cycleTimer = setInterval(() => {
+      if (selectedSlideshowThemes.length === 0) return;
       const currentPalette = vaultData.theme.palette;
-      const currentIdx = masterpiecePalettes.indexOf(currentPalette);
-      const nextIdx = (currentIdx + 1) % masterpiecePalettes.length;
-      const nextPalette = masterpiecePalettes[nextIdx];
+      const currentIdx = selectedSlideshowThemes.indexOf(currentPalette);
+      const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % selectedSlideshowThemes.length;
+      const nextPalette = selectedSlideshowThemes[nextIdx];
+
+      let targetMode: 'dark' | 'light' = 'dark';
+      if (nextPalette.startsWith('custom-')) {
+        const cTheme = (vaultData.customThemeConfigs || []).find(c => `custom-${c.id}` === nextPalette);
+        targetMode = cTheme ? cTheme.bgMode : 'dark';
+      } else if (['skyblue', 'pure-light', 'sand-drift', 'lavender-blush', 'mint-fresh'].includes(nextPalette)) {
+        targetMode = 'light';
+      }
 
       handleChangeTheme({
-        mode: 'dark',
+        mode: targetMode,
         palette: nextPalette as any
       });
     }, intervalSec * 1000);
@@ -305,6 +337,32 @@ export default function App() {
       if (decryptedString) {
         try {
           const parsedData = JSON.parse(decryptedString) as EchelonState;
+          
+          // Migrations to ensure all fields are initialized securely
+          if (parsedData.customSavingsGoalAmt === undefined) {
+            parsedData.customSavingsGoalAmt = 5000;
+          }
+          if (parsedData.isOnboarded === undefined) {
+            // If they already have loaded assets/loans, let's treat them as onboarded so we don't annoy them
+            parsedData.isOnboarded = parsedData.assets && parsedData.assets.length > 0;
+          }
+          if (!parsedData.assets) {
+            parsedData.assets = [];
+          }
+          const hasCash = parsedData.assets.some(a => a.type === AssetType.CASH_CARRY);
+          if (!hasCash) {
+            parsedData.assets.push({
+              id: 'asset-cash-wallet',
+              type: AssetType.CASH_CARRY,
+              name: 'Cash Wallet',
+              institution: 'Physical Cash',
+              currentValue: 0,
+              realisedReturns: 0,
+              annualGrowthRate: 0,
+              lastUpdated: new Date().toISOString()
+            });
+          }
+
           setVaultData(parsedData);
           setActivePin(pin);
           setIsLocked(false);
@@ -662,6 +720,20 @@ export default function App() {
     }));
   };
 
+  const handleUpdateTaggedBufferAssetId = (assetId: string) => {
+    mutateVaultData(`Updated Tagged Safety Buffer Asset`, (current) => ({
+      ...current,
+      taggedBufferAssetId: assetId,
+    }));
+  };
+
+  const handleUpdateTaggedBufferAssetIds = (assetIds: string[]) => {
+    mutateVaultData(`Updated Tagged Safety Buffer Assets`, (current) => ({
+      ...current,
+      taggedBufferAssetIds: assetIds,
+    }));
+  };
+
   // --- CREDIT CARD HANDLERS ---
   const handleAddCreditCard = (cardData: Omit<CreditCard, 'id'>) => {
     const newCard: CreditCard = {
@@ -755,7 +827,7 @@ export default function App() {
   };
 
   // --- OUTFLOW LOGGING WITH SWEEP-IN FD INTEGRATION ---
-  const handleAddOutflow = (expenseData: Omit<Expense, 'id'>, source: { sourceType: 'bank_balance' | 'credit_card'; sourceId: string }) => {
+  const handleAddOutflow = (expenseData: Omit<Expense, 'id'>, source: { sourceType: 'bank_balance' | 'credit_card' | 'cash_carry'; sourceId: string }) => {
     const newExpense: Expense = {
       ...expenseData,
       id: `ex-${Date.now()}`,
@@ -783,10 +855,10 @@ export default function App() {
           } else {
             // Deficit! Let's check for linked sweep-in FDs
             const linkedFD = updatedAssets.find(a => 
-              a.type === AssetType.FD && 
-              a.sweepInEnabled && 
-              a.sweepInLinkedAssetId === bankAsset.id && 
-              a.currentValue > 0
+               a.type === AssetType.FD && 
+               a.sweepInEnabled && 
+               a.sweepInLinkedAssetId === bankAsset.id && 
+               a.currentValue > 0
             );
             
             if (linkedFD) {
@@ -810,6 +882,13 @@ export default function App() {
               remainderLeft = bankAsset.currentValue;
             }
           }
+        }
+      } else if (source.sourceType === 'cash_carry') {
+        const cashAsset = updatedAssets.find(a => a.id === source.sourceId);
+        if (cashAsset) {
+          sourceName = cashAsset.name;
+          cashAsset.currentValue = parseFloat((cashAsset.currentValue - expenseData.amount).toFixed(2));
+          remainderLeft = cashAsset.currentValue;
         }
       } else if (source.sourceType === 'credit_card') {
         const card = updatedCards.find(c => c.id === source.sourceId);
@@ -842,6 +921,30 @@ export default function App() {
         outflows: [newOutflowLog, ...updatedOutflows],
       };
     });
+  };
+
+  const handleDismissAlert = (alertItem: { rule: AlertRule; message: string; severity: 'warning' | 'info' }) => {
+    if (!vaultData) return;
+    const rule = alertItem.rule;
+    const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
+    const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+    const linkedNames = selectedAssets.map(a => a.name).join(', ') || 'Global';
+
+    setSessionDismissedAlertIds(prev => [...prev, rule.id]);
+
+    const newAckRecord: AcknowledgedAlertRecord = {
+      id: `ack-${Date.now()}-${rule.id}`,
+      ruleName: rule.name,
+      message: alertItem.message,
+      date: new Date().toISOString(),
+      linkedFundName: linkedNames,
+      closingBalance: combinedValue,
+    };
+
+    mutateVaultData(`Dismissed Safeguard Alert: ${rule.name}`, (current) => ({
+      ...current,
+      acknowledgedAlerts: [newAckRecord, ...(current.acknowledgedAlerts || [])],
+    }));
   };
 
   const handleLiquidateAssetPrematurely = (assetId: string, targetBankAccountId: string) => {
@@ -1000,18 +1103,34 @@ export default function App() {
     });
   };
 
-  const handleAddCustomTheme = (name: string, color: string, bgMode: 'dark' | 'light') => {
+  const handleAddCustomTheme = (
+    name: string,
+    color: string,
+    bgMode: 'dark' | 'light',
+    bgColor: string,
+    textColor: string,
+    buttonBgColor: string,
+    buttonTextColor: string,
+    fontStyle: 'classic-inter' | 'cyber-mono' | 'serif-editorial'
+  ) => {
     if (!vaultData) return;
     const currentThemes = vaultData.customThemeConfigs || [];
-    if (currentThemes.length + 4 >= 10) {
-      alert("Theme Limit Reached: You have reached the overall limit of 10 themes. Under security rules, please delete an existing custom theme first.");
+    const modeThemesCount = currentThemes.filter(c => c.bgMode === bgMode).length;
+    if (modeThemesCount >= 5) {
+      alert(`Limit Reached: You have reached the limit of 5 custom themes for ${bgMode} mode. Under security rules, please delete an existing custom theme in this mode first.`);
       return;
     }
-    const newTheme = {
+    const newTheme: CustomThemeConfig = {
       id: `th-${Date.now()}`,
       name,
       primaryColor: color,
       bgMode,
+      backgroundColor: bgColor,
+      textColor: textColor,
+      accentColor: color,
+      buttonBgColor: buttonBgColor,
+      buttonTextColor: buttonTextColor,
+      fontStyle: fontStyle,
     };
     saveVaultData({
       ...vaultData,
@@ -1095,43 +1214,21 @@ export default function App() {
     setDownloadModalOpen(true);
   };
 
-  // If locked or no pin set, render the secure Pin code locker screen
-  if (isLocked || !vaultData) {
-    return (
-      <PasscodeScreen
-        theme={{ mode: 'dark', palette: 'black' }} // Defaults locked to extreme premium black obsidian theme
-        pinHash={pinHash}
-        onUnlock={handleUnlockAndDecrypt}
-        onSetPin={handleSetupNewPIN}
-        selectedGalleryIcon={publicIcon}
-        onResetApp={() => {
-          localStorage.clear();
-          setPinHash('');
-          setVaultData(null);
-          setIsLocked(true);
-          setActivePin('');
-        }}
-      />
-    );
-  }
-
-  // Active theme parameters
-  const tokens = getColorTokens(vaultData.theme);
-  
   // Calculate aggregate portfolio values for goal timetables
-  const totalAssetsVal = vaultData.assets.reduce((sum, a) => sum + a.currentValue, 0);
-  const totalLentVal = vaultData.loans
+  const totalAssetsVal = vaultData ? vaultData.assets.reduce((sum, a) => sum + a.currentValue, 0) : 0;
+  const totalLentVal = vaultData ? vaultData.loans
     .filter(l => l.type === LoanType.LENT)
-    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
-  const totalBorrowedVal = vaultData.loans
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0) : 0;
+  const totalBorrowedVal = vaultData ? vaultData.loans
     .filter(l => l.type === LoanType.BORROWED)
-    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0) : 0;
   
-  const totalCreditCardLiabilitiesVal = (vaultData.creditCards || [])
-    .reduce((sum, c) => sum + calculateCreditCardEffectiveLiability(c), 0);
+  const totalCreditCardLiabilitiesVal = vaultData ? (vaultData.creditCards || [])
+    .reduce((sum, c) => sum + calculateCreditCardEffectiveLiability(c), 0) : 0;
   
   const totalNetWorth = totalAssetsVal + totalLentVal - totalBorrowedVal - totalCreditCardLiabilitiesVal;
-  const rates = calculateWealthRates(
+
+  const rates = vaultData ? calculateWealthRates(
     vaultData.assets,
     vaultData.loans,
     vaultData.monthlyEarnings,
@@ -1140,9 +1237,14 @@ export default function App() {
     vaultData.userOverriddenExpenses,
     vaultData.customSavingsGoalAmt,
     vaultData.budget.amount
-  );
-
-  const activeColor = vaultData.activeAccentColor || '#f59e0b';
+  ) : {
+    earningsPerHour: 0, lossesPerHour: 0, netPerHour: 0,
+    earningsPerDay: 0, lossesPerDay: 0, netPerDay: 0,
+    earningsPerMonth: 0, lossesPerMonth: 0, netPerMonth: 0,
+    earningsPerYear: 0, lossesPerYear: 0, netPerYear: 0,
+    earningsPerFiveYears: 0, lossesPerFiveYears: 0, netPerFiveYears: 0,
+    earningsRatePercentOfYear: 0,
+  };
 
   const getTriggeredAlerts = () => {
     if (!vaultData || !vaultData.structuredAlertRules) return [];
@@ -1202,10 +1304,69 @@ export default function App() {
     return triggered;
   };
 
+  // Prune any stale session-dismissed alerts that are no longer triggering
+  useEffect(() => {
+    if (!vaultData) return;
+    const activeAlertIds = getTriggeredAlerts().map(a => a.rule.id);
+    setSessionDismissedAlertIds(prev => prev.filter(id => activeAlertIds.includes(id)));
+  }, [vaultData?.assets, vaultData?.loans, vaultData?.expenses, vaultData?.creditCards]);
+
   const triggeredAlerts = getTriggeredAlerts();
+  const unacknowledgedAlerts = triggeredAlerts.filter(a => !sessionDismissedAlertIds.includes(a.rule.id));
+  const unacknowledgedAlertsCount = unacknowledgedAlerts.length;
+
+  // If locked or no pin set, render the secure Pin code locker screen
+  if (isLocked || !vaultData) {
+    return (
+      <PasscodeScreen
+        theme={{ mode: 'dark', palette: 'black' }} // Defaults locked to extreme premium black obsidian theme
+        pinHash={pinHash}
+        onUnlock={handleUnlockAndDecrypt}
+        onSetPin={handleSetupNewPIN}
+        selectedGalleryIcon={publicIcon}
+        onResetApp={() => {
+          localStorage.clear();
+          setPinHash('');
+          setVaultData(null);
+          setIsLocked(true);
+          setActivePin('');
+        }}
+      />
+    );
+  }
+
+  // If the user has not onboarded their salary and budget, show the baseline setup wizard
+  if (!vaultData.isOnboarded) {
+    return (
+      <EchelonOnboardingScreen
+        theme={vaultData.theme}
+        currencySymbol={vaultData.currencySymbol || '₹'}
+        onComplete={(salary, budgetAmt, bufferAmt) => {
+          saveVaultData({
+            ...vaultData,
+            monthlyEarnings: salary,
+            budget: {
+              ...vaultData.budget,
+              amount: budgetAmt,
+            },
+            customSavingsGoalAmt: bufferAmt,
+            isOnboarded: true,
+          });
+        }}
+      />
+    );
+  }
+
+  // Active theme parameters
+  const tokens = getColorTokens(vaultData.theme);
+  const activeColor = vaultData.activeAccentColor || '#f59e0b';
+  const activeCustomTheme = vaultData && vaultData.theme.palette.startsWith('custom-')
+    ? (vaultData.customThemeConfigs || []).find(c => `custom-${c.id}` === vaultData.theme.palette)
+    : null;
+  const activeFontClass = activeCustomTheme?.fontStyle || vaultData?.selectedFontOption || 'classic-inter';
 
   return (
-    <div className={`min-h-screen ${tokens.bg} pb-36 transition-colors duration-500 text-stone-100 relative`}>
+    <div className={`min-h-screen ${tokens.bg} pb-36 transition-colors duration-500 text-stone-100 relative font-${activeFontClass}`}>
       <style>{`
         .text-amber-500 { color: ${activeColor} !important; }
         .bg-amber-500 { background-color: ${activeColor} !important; }
@@ -1224,6 +1385,27 @@ export default function App() {
         .hover\\:text-amber-400:hover { color: ${activeColor}bb !important; }
         .hover\\:border-amber-500\\/30:hover { border-color: ${activeColor}4d !important; }
         .hover\\:scale-110:hover { transform: scale(1.1); }
+        
+        ${activeCustomTheme ? `
+          .custom-theme-bg { background-color: ${activeCustomTheme.backgroundColor || '#08080a'} !important; }
+          .custom-theme-card { 
+            background-color: ${activeCustomTheme.backgroundColor ? activeCustomTheme.backgroundColor + 'cc' : '#111115cc'} !important; 
+            border-color: ${(activeCustomTheme.accentColor || activeColor)}22 !important; 
+          }
+          .custom-theme-card-hover:hover {
+            background-color: ${activeCustomTheme.backgroundColor ? activeCustomTheme.backgroundColor + 'ee' : '#14141dee'} !important;
+            border-color: ${(activeCustomTheme.accentColor || activeColor)}44 !important;
+          }
+          .custom-theme-text-primary { color: ${activeCustomTheme.textColor || '#f3f0fa'} !important; }
+          .custom-theme-text-secondary { color: ${(activeCustomTheme.textColor || '#f3f0fa')}cc !important; }
+          .custom-theme-accent { background-color: ${activeCustomTheme.accentColor || activeColor} !important; color: ${activeCustomTheme.buttonTextColor || '#000000'} !important; }
+          .custom-theme-accent-text { color: ${activeCustomTheme.accentColor || activeColor} !important; }
+          .custom-theme-border { border-color: ${(activeCustomTheme.textColor || '#f3f0fa')}22 !important; }
+          .custom-theme-border-accent { border-color: ${activeCustomTheme.accentColor || activeColor} !important; }
+          .custom-theme-button-bg { background-color: ${activeCustomTheme.buttonBgColor || '#1c1917'} !important; color: ${activeCustomTheme.buttonTextColor || '#ffffff'} !important; }
+          .custom-theme-badge-bg { background-color: ${(activeCustomTheme.accentColor || activeColor)}18 !important; border-color: ${(activeCustomTheme.accentColor || activeColor)}33 !important; }
+          .custom-theme-badge-text { color: ${activeCustomTheme.accentColor || activeColor} !important; }
+        ` : ''}
       `}</style>
       
       {/* 1. SECURE TOP NAVIGATION HEADER */}
@@ -1242,6 +1424,24 @@ export default function App() {
 
           {/* Core Controls */}
           <div className="flex items-center gap-2">
+            
+            {/* Safeguards Audit & Notifications Button */}
+            <button
+              type="button"
+              id="notifications-bell-btn"
+              onClick={() => setShowNotificationsModal(true)}
+              className={`p-2 bg-zinc-900 border border-stone-800 text-stone-300 rounded-xl hover:text-amber-500 hover:border-amber-500/30 transition-all flex items-center justify-center relative ${
+                unacknowledgedAlertsCount > 0 ? 'animate-pulse ring-2 ring-rose-500/40' : ''
+              }`}
+              title="Confidential Safeguard Alert Centre"
+            >
+              <Bell className={`h-4 w-4 ${unacknowledgedAlertsCount > 0 ? 'text-amber-500' : 'text-stone-400'}`} />
+              {unacknowledgedAlertsCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-rose-500 text-[8.5px] font-mono font-bold text-white rounded-full flex items-center justify-center border border-stone-900">
+                  {unacknowledgedAlertsCount}
+                </span>
+              )}
+            </button>
             
             {/* Settings triggers */}
             <button
@@ -1287,30 +1487,6 @@ export default function App() {
       {/* MAIN WORKSPACE SECTION */}
       <main className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
         
-        {/* ACTIVE TRIGGERED SYSTEM ALERTS */}
-        {triggeredAlerts.length > 0 && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2 shadow-md">
-            <div className="flex items-center gap-2 pb-1.5 border-b border-rose-500/10">
-              <span className="inline-flex h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-              <span className="text-[10.5px] uppercase font-black text-rose-400 tracking-wider font-mono">⚠️ Echelon Safeguard Alerts Active ({triggeredAlerts.length})</span>
-            </div>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-              {triggeredAlerts.map((alertItem, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-xs font-mono text-stone-200">
-                  <span className="text-rose-500 font-bold shrink-0">•</span>
-                  <div className="flex-1">
-                    <span className="text-zinc-400 font-semibold inline-block mr-1">[{alertItem.rule.name}]:</span>
-                    <span className="text-stone-350">{alertItem.message}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-[9px] text-stone-500 font-mono text-right italic pt-1">
-              Configure alert limits and single/multiple fund anchors in Settings &gt; Goals, Sinks & Alerts
-            </p>
-          </div>
-        )}
-        
         {/* 2. DYNAMIC WORKSPACE PAGES */}
         <div className="animate-fade-in pb-36">
           
@@ -1345,6 +1521,10 @@ export default function App() {
                   setShowSettings(true);
                 }}
                 budgetAmount={vaultData.budget.amount}
+                taggedBufferAssetId={vaultData.taggedBufferAssetId}
+                onUpdateTaggedBufferAsset={handleUpdateTaggedBufferAssetId}
+                taggedBufferAssetIds={vaultData.taggedBufferAssetIds || []}
+                onUpdateTaggedBufferAssets={handleUpdateTaggedBufferAssetIds}
               />
 
               <GoalMilestones
@@ -1496,6 +1676,115 @@ export default function App() {
           <span className="text-[9px] uppercase tracking-wider font-mono font-bold">AI Insights</span>
         </button>
       </div>
+
+      {/* ECHELON SAFEGUARDS NOTIFICATION & AUDIT CENTRE MODAL */}
+      {showNotificationsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-zinc-900 border border-stone-850 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl text-stone-100 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-stone-850 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-amber-500 animate-pulse" />
+                  <span>Safeguards Notification & Audit Centre</span>
+                </h2>
+                <p className="text-xs text-stone-500">Acknowledge boundary violations and audit past archived security events</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotificationsModal(false)}
+                className="px-3 py-1 bg-stone-850 hover:bg-stone-800 text-stone-400 hover:text-white rounded-xl text-xs font-mono font-bold transition-all"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Active alerts panel */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-mono uppercase font-black tracking-widest text-amber-500">
+                ⚠️ Active Safeguard Violations ({unacknowledgedAlerts.length})
+              </h3>
+              
+              {unacknowledgedAlerts.length === 0 ? (
+                <div className="p-6 border border-dashed border-stone-800 rounded-2xl text-center space-y-2">
+                  <p className="text-xs font-mono text-emerald-400">✓ ALL TREASURY BOUNDARIES COMPLIANT</p>
+                  <p className="text-[11px] text-stone-500">None of your custom rules, sink thresholds, or allocation weights are flagged.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {unacknowledgedAlerts.map((alertItem, idx) => {
+                    const rule = alertItem.rule;
+                    const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
+                    const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+
+                    return (
+                      <div key={idx} className="p-4 bg-rose-950/25 border border-rose-500/25 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                              Rule [{rule.name}] Flagged
+                            </span>
+                            <span className="text-[10px] font-mono text-rose-500 uppercase font-semibold">Severity: {alertItem.severity}</span>
+                          </div>
+                          <p className="text-xs text-stone-200 leading-relaxed font-sans">{alertItem.message}</p>
+                          <div className="text-[10px] text-stone-500 font-mono space-y-0.5">
+                            <div>• Linked Fund Assets: {selectedAssets.map(a => a.name).join(', ') || 'Global'}</div>
+                            <div>• Target Limit: {vaultData.currencySymbol || '₹'}{(rule.targetAmount || 0).toLocaleString()} </div>
+                            <div>• Closing Boundary Balance: <strong className="text-white">{vaultData.currencySymbol || '₹'}{combinedValue.toLocaleString()}</strong></div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleDismissAlert(alertItem)}
+                            className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-stone-950 border border-rose-500/20 text-rose-400 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xl transition-all"
+                          >
+                            ✓ Dismiss & Archive Event
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Historic audit logs feed */}
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs font-mono uppercase font-black tracking-widest text-stone-400">
+                📜 Permanently Archived Security Audit Trails ({ (vaultData.acknowledgedAlerts || []).length })
+              </h3>
+              
+              {(!vaultData.acknowledgedAlerts || vaultData.acknowledgedAlerts.length === 0) ? (
+                <div className="p-4 bg-stone-900/40 border border-stone-850/50 rounded-2xl text-center">
+                  <p className="text-[11px] text-stone-500 italic font-sans">No historic audit records logged yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {vaultData.acknowledgedAlerts.map((ack) => (
+                    <div key={ack.id} className="p-3 bg-stone-900/40 border border-stone-850/40 rounded-xl space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono">
+                        <span className="text-stone-400 font-bold">{ack.ruleName}</span>
+                        <span className="text-stone-500">{new Date(ack.date).toLocaleString()}</span>
+                      </div>
+                      <p className="text-xs text-stone-300 font-sans">{ack.message}</p>
+                      {ack.linkedFundName && (
+                        <div className="text-[9.5px] text-stone-500 font-mono">
+                          Linked Asset Anchor: {ack.linkedFundName} | Closing Boundary Val: <span className="text-stone-400 font-semibold">{vaultData.currencySymbol || '₹'}{(ack.closingBalance || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* DYNAMIC SETTINGS VAULT DRAWER MODAL OVERLAY */}
       {showSettings && (
@@ -1737,47 +2026,204 @@ export default function App() {
 
             {/* SUB-TAB B: DETAILED THEMING, METALS & SOLID CUSTOM CONFIGS */}
             {settingsTab === 'themes' && (
-              <div className="space-y-4 animate-fade-in">
+              <div className="space-y-5 animate-fade-in text-stone-300">
                 
-                {/* 1. Predefined Metallics Selection */}
+                {/* 1. Mode Tab Selector */}
+                <div className="flex bg-stone-950 p-1 rounded-xl border border-stone-850">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThemeModeTab('dark');
+                      setNewThemeColor('#f59e0b');
+                      setNewThemeBgColor('#08080a');
+                      setNewThemeTextColor('#f3f0fa');
+                      setNewThemeBtnBgColor('#1c1917');
+                      setNewThemeBtnTextColor('#ffffff');
+                    }}
+                    className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all ${
+                      themeModeTab === 'dark' 
+                        ? 'bg-amber-500/15 border border-amber-500/35 text-amber-400' 
+                        : 'text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    Dark Themes (Obsidian)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThemeModeTab('light');
+                      setNewThemeColor('#10b981');
+                      setNewThemeBgColor('#f0fdf4');
+                      setNewThemeTextColor('#064e3b');
+                      setNewThemeBtnBgColor('#d1fae5');
+                      setNewThemeBtnTextColor('#064e3b');
+                    }}
+                    className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all ${
+                      themeModeTab === 'light' 
+                        ? 'bg-emerald-500/15 border border-emerald-500/35 text-emerald-400' 
+                        : 'text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    Light Themes (Alabaster)
+                  </button>
+                </div>
+
+                {/* 2. System and Custom Themes list */}
                 <div>
-                  <span className="text-xs font-bold text-stone-300 block mb-2">Predefined Premium Themes (Echelon Originals)</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    {[
-                      { palette: 'elegant-dark', label: 'Platinum Dark', bg: 'bg-zinc-900 border-zinc-800' },
-                      { palette: 'black', label: 'Charcoal Gold', bg: 'bg-black border-amber-500/20' },
-                      { palette: 'silver', label: 'Swiss Silver', bg: 'bg-slate-900 border-blue-500/20' },
-                      { palette: 'blue', label: 'Midnight Teal', bg: 'bg-[#0f172a] border-teal-500/20' },
-                      { palette: 'stealth-gold', label: 'Stealth Gold', bg: 'bg-[#111115] border-amber-500/20' },
-                      { palette: 'black-steel', label: 'Black Steel', bg: 'bg-[#0e0f11] border-zinc-700' },
-                      { palette: 'royal-emerald', label: 'Royal Emerald', bg: 'bg-[#03160a] border-emerald-500/20' },
-                      { palette: 'rose-amethyst', label: 'Rose Amethyst', bg: 'bg-[#0d091a] border-purple-500/20' },
-                      { palette: 'platinum-silver', label: 'Valkyrie Plat', bg: 'bg-[#111317] border-cyan-500/20' },
-                      { palette: 'slate-amber', label: 'Chronos Amber', bg: 'bg-[#101318] border-orange-500/25' }
-                    ].map((p) => {
-                      const isSel = vaultData.theme.palette === p.palette;
+                  <span className="text-xs font-bold text-stone-200 block mb-2">
+                    Available {themeModeTab === 'dark' ? 'Dark' : 'Light'} Custom & Standard Matrices
+                  </span>
+                  
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 border border-stone-850 p-2.5 rounded-xl bg-stone-950/40 scrollbar-thin">
+                    {(() => {
+                      // Define system themes for active tab
+                      const systemThemes = themeModeTab === 'dark' 
+                        ? [
+                            { palette: 'elegant-dark', label: 'Platinum Dark (Original)', desc: 'Slate-polished minimalist obsidian backdrop' },
+                            { palette: 'black', label: 'Charcoal Gold', desc: 'Prestige gold accents tracing extreme deep black obsidian' },
+                            { palette: 'silver', label: 'Swiss Royal Silver', desc: 'Symmetrical Swiss luxury silver with electric blue highlights' },
+                            { palette: 'blue', label: 'Midnight Teal', desc: 'Luminous galactic copper neon mapping midnight space' },
+                            { palette: 'stealth-gold', label: 'Stealth Matte Gold', desc: 'Low-emission military matte titanium with luxury gold tracing' }
+                          ]
+                        : [
+                            { palette: 'skyblue', label: 'Clear Skyblue', desc: 'Airborne summer sky blue with pure black high-contrast text' },
+                            { palette: 'pure-light', label: 'Pure Chaste Alabaster', desc: 'Bright sterile medical clean white with rich dark-stone text' },
+                            { palette: 'sand-drift', label: 'Sahara Sand', desc: 'Sophisticated warm golden sand dunes tracing coffee undertones' },
+                            { palette: 'lavender-blush', label: 'Lavender Blossom', desc: 'Delicate light amethyst with high-definition royal violet fonts' },
+                            { palette: 'mint-fresh', label: 'Spearmint Fresh', desc: 'Dynamic energetic mint light green with rich emerald outlines' }
+                          ];
+
+                      const customThemes = (vaultData.customThemeConfigs || []).filter(c => c.bgMode === themeModeTab);
+                      
                       return (
-                        <button
-                          key={p.palette}
-                          type="button"
-                          onClick={() => handleChangeTheme({ mode: 'dark', palette: p.palette as any })}
-                          className={`p-3 rounded-xl border text-center transition-all ${p.bg} ${
-                            isSel ? 'ring-2 ring-amber-500' : 'opacity-85 hover:opacity-100'
-                          }`}
-                        >
-                          <span className="text-xs font-bold text-stone-100 block">{p.label}</span>
-                        </button>
+                        <>
+                          {/* System themes */}
+                          {systemThemes.map(st => {
+                            const isCur = vaultData.theme.palette === st.palette;
+                            const isSelectedInSlideshow = (vaultData.slideshowThemeKeys || []).includes(st.palette);
+                            return (
+                              <div key={st.palette} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-stone-900/40 border border-stone-850 gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-stone-100">{st.label}</span>
+                                    <span className="text-[8px] bg-stone-800 border border-stone-700 text-stone-400 font-mono px-1.5 py-0.2 rounded font-semibold uppercase">SYSTEM</span>
+                                  </div>
+                                  <p className="text-[10px] text-stone-500 leading-relaxed mt-0.5">{st.desc}</p>
+                                </div>
+                                <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
+                                  {/* Slideshow inclusion checkbox */}
+                                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] select-none text-stone-400 hover:text-stone-300">
+                                    <input 
+                                      type="checkbox"
+                                      className="accent-amber-500 rounded cursor-pointer h-3.5 w-3.5"
+                                      checked={isSelectedInSlideshow}
+                                      onChange={() => {
+                                        const keys = vaultData.slideshowThemeKeys || [];
+                                        const updated = keys.includes(st.palette) 
+                                          ? keys.filter(k => k !== st.palette)
+                                          : [...keys, st.palette];
+                                        saveVaultData({
+                                          ...vaultData,
+                                          slideshowThemeKeys: updated
+                                        });
+                                      }}
+                                    />
+                                    <span className="font-mono">In Slideshow</span>
+                                  </label>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleChangeTheme({ mode: themeModeTab, palette: st.palette as any })}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold ${
+                                      isCur 
+                                        ? 'bg-amber-500 text-zinc-950' 
+                                        : 'bg-zinc-800 hover:bg-zinc-700 text-stone-300 border border-stone-800'
+                                    }`}
+                                  >
+                                    Activate
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Custom themes */}
+                          {customThemes.length === 0 ? (
+                            <div className="text-[10px] text-stone-500 italic font-mono py-1.5 text-center">
+                              No custom {themeModeTab} themes have been added yet. Add one below to customize!
+                            </div>
+                          ) : (
+                            customThemes.map(t => {
+                              const themeKey = `custom-${t.id}`;
+                              const isCur = vaultData.theme.palette === themeKey;
+                              const isSelectedInSlideshow = (vaultData.slideshowThemeKeys || []).includes(themeKey);
+                              return (
+                                <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-stone-900/70 border border-stone-850 gap-3">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-semibold text-amber-500">{t.name}</span>
+                                      <span className="text-[8px] bg-amber-500/10 border border-amber-500/20 text-amber-500 font-mono px-1.5 py-0.2 rounded font-bold uppercase">CUSTOM</span>
+                                    </div>
+                                    <p className="text-[9.5px] font-mono text-stone-500 leading-relaxed mt-0.5">
+                                      Background: {t.backgroundColor} | Primary Accent: {t.primaryColor} | Text: {t.textColor}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2.5 self-end sm:self-auto shrink-0">
+                                    {/* Slideshow inclusion checkbox */}
+                                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] select-none text-stone-400 hover:text-stone-300">
+                                      <input 
+                                        type="checkbox"
+                                        className="accent-amber-500 rounded cursor-pointer h-3.5 w-3.5"
+                                        checked={isSelectedInSlideshow}
+                                        onChange={() => {
+                                          const keys = vaultData.slideshowThemeKeys || [];
+                                          const updated = keys.includes(themeKey) 
+                                            ? keys.filter(k => k !== themeKey)
+                                            : [...keys, themeKey];
+                                          saveVaultData({
+                                            ...vaultData,
+                                            slideshowThemeKeys: updated
+                                          });
+                                        }}
+                                      />
+                                      <span className="font-mono">In Slideshow</span>
+                                    </label>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleChangeTheme({ mode: themeModeTab, palette: themeKey as any })}
+                                      className={`px-3 py-1 rounded-lg text-[10px] font-bold ${
+                                        isCur 
+                                          ? 'bg-amber-500 text-zinc-950' 
+                                          : 'bg-zinc-800 hover:bg-zinc-700 text-stone-300 border border-stone-800'
+                                      }`}
+                                    >
+                                      Activate
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCustomTheme(t.id)}
+                                      className="text-red-500 hover:text-red-400 hover:bg-red-500/5 text-[9.5px] font-mono font-extrabold uppercase shrink-0 px-2 py-1 rounded border border-red-500/10 hover:border-red-500/20"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
 
-                {/* Masterpiece Slideshow Mode controls */}
+                {/* 3. Atmosphere Slideshow Mode controls */}
                 <div className="bg-stone-500/5 p-4 rounded-xl border border-stone-850/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-bold text-stone-300 block">Atmosphere Slideshow Mode</span>
-                      <p className="text-[10px] text-stone-500 mt-0.5">Automatically cycle between the 10 Echelon Originals over customizable timeslots</p>
+                      <span className="text-xs font-bold text-stone-200 block">Atmosphere Slideshow Mode</span>
+                      <p className="text-[10px] text-stone-500 mt-0.5">Automatically cycle between the selected custom or system themes over customizable timeslots</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
@@ -1792,172 +2238,216 @@ export default function App() {
                   </div>
 
                   {vaultData.slideshowEnabled && (
-                    <div className="flex items-center gap-3 animate-fade-in pt-1">
-                      <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Cycle Interval:</span>
-                      <select
-                        id="theme-slideshow-interval"
-                        value={vaultData.slideshowIntervalSeconds || 10}
-                        onChange={(e) => handleToggleThemeSlideshow(true, parseInt(e.target.value) || 10)}
-                        className="bg-stone-950 border border-stone-800 rounded px-2 py-1 text-xs text-white font-mono"
-                      >
-                        <option value="5">5 Seconds (Testing)</option>
-                        <option value="10">10 Seconds</option>
-                        <option value="30">30 Seconds</option>
-                        <option value="60">1 Minute</option>
-                        <option value="300">5 Minutes</option>
-                      </select>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 animate-fade-in pt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Cycle Interval Preset:</span>
+                        <select
+                          id="theme-slideshow-interval"
+                          value={[5, 10, 30, 60, 300].includes(vaultData.slideshowIntervalSeconds || 10) ? vaultData.slideshowIntervalSeconds || 10 : "custom"}
+                          onChange={(e) => {
+                            if (e.target.value !== "custom") {
+                              handleToggleThemeSlideshow(true, parseInt(e.target.value) || 10);
+                            }
+                          }}
+                          className="bg-stone-950 border border-stone-800 rounded px-2.5 py-1 text-xs text-white font-mono"
+                        >
+                          <option value="5">5 Seconds</option>
+                          <option value="10">10 Seconds</option>
+                          <option value="30">30 Seconds</option>
+                          <option value="60">1 Minute</option>
+                          <option value="300">5 Minutes</option>
+                          <option value="custom">Custom Entry</option>
+                        </select>
+                      </div>
+
+                      {/* Custom input entry field in seconds */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-stone-500 font-mono">Custom Entry (Seconds):</span>
+                        <input
+                          type="number"
+                          min="1"
+                          id="theme-slideshow-interval-custom"
+                          value={vaultData.slideshowIntervalSeconds || 10}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 10;
+                            handleToggleThemeSlideshow(true, val);
+                          }}
+                          className="w-20 px-2 py-0.5 bg-stone-950 border border-stone-850 text-xs font-mono font-bold text-white rounded text-center focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* 2. Custom Hex Active Accent selection */}
-                <div className="bg-stone-500/5 p-4 rounded-xl border border-stone-850/60 space-y-2">
-                  <span className="text-xs font-bold text-stone-300 block">Dynamic Accent Coloring Picker</span>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { hex: '#f59e0b', label: 'Gold Amber' },
-                      { hex: '#2563eb', label: 'Royal Silver' },
-                      { hex: '#10b981', label: 'Emerald Mint' },
-                      { hex: '#a855f7', label: 'Bright Orchid' },
-                      { hex: '#ef4444', label: 'Sunset Crimson' },
-                      { hex: '#ffffff', label: 'Chaste White' }
-                    ].map((cc) => {
-                      const isSel = (vaultData.activeAccentColor || '#f59e0b').toLowerCase() === cc.hex.toLowerCase();
-                      return (
-                        <button
-                          key={cc.hex}
-                          type="button"
-                          onClick={() => handleUpdateActiveAccentColor(cc.hex)}
-                          className="px-2.5 py-1.5 rounded-lg border text-xs font-mono font-semibold transition-all flex items-center gap-1.5"
-                          style={{
-                            borderColor: isSel ? cc.hex : 'rgba(120, 110, 100, 0.2)',
-                            backgroundColor: isSel ? `${cc.hex}15` : 'transparent',
-                            color: isSel ? cc.hex : '#a8a29e'
-                          }}
-                        >
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.hex }} />
-                          {cc.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* 4. Rich Custom Theme Creation Card */}
+                {(() => {
+                  const currentModeThemes = (vaultData.customThemeConfigs || []).filter(c => c.bgMode === themeModeTab);
+                  const limitReached = currentModeThemes.length >= 5;
+                  const activeModeCount = 5 + currentModeThemes.length;
+                  
+                  return (
+                    <div className="p-4 rounded-xl border border-stone-850/60 space-y-4 bg-stone-500/5">
+                      <div>
+                        <span className="text-xs font-bold text-stone-200 block">Create Bespoke {themeModeTab === 'dark' ? 'Dark' : 'Light'} Custom Theme Composition</span>
+                        <p className="text-[10px] text-stone-500 leading-relaxed mt-1">
+                          Echelon allows up to a maximum limit of <strong className="font-bold text-amber-500">10 theme configurations</strong> per mode (5 system + 5 custom). Currently you have <strong className="font-bold text-amber-500">{activeModeCount}/10</strong> active profiles in <span className="capitalize font-semibold">{themeModeTab} Mode</span>.
+                        </p>
+                      </div>
 
-                  <div className="flex items-center gap-3 pt-2">
-                    <span className="text-xs text-stone-400">Or enter Custom HEX Color code:</span>
-                    <input
-                      type="text"
-                      maxLength={7}
-                      value={vaultData.activeAccentColor || '#f59e0b'}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.startsWith('#') && val.length <= 7) {
-                          handleUpdateActiveAccentColor(val);
-                        }
-                      }}
-                      className="w-24 px-2 py-1 bg-stone-950 border border-stone-800 text-xs font-mono font-bold text-white rounded outline-none text-center"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Theme creators */}
-                <div className="p-4 rounded-xl border border-stone-850/60 space-y-3">
-                  <span className="text-xs font-bold text-stone-300 block">Create Dynamic Bespoke Custom theme</span>
-                  <p className="text-[10px] text-stone-500 leading-relaxed">
-                    Echelon allows overall themed systems up to a maximum limit of **10 theme configurations**. You currently have **{(vaultData.customThemeConfigs || []).length + 4}/10** active profiles.
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Midnight Onyx"
-                      value={newThemeName}
-                      onChange={(e) => setNewThemeName(e.target.value)}
-                      className="px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-stone-200 rounded-lg outline-none"
-                    />
-                    <div className="flex gap-1">
-                      <input
-                        type="color"
-                        value={newThemeColor}
-                        onChange={(e) => setNewThemeColor(e.target.value)}
-                        className="h-8 w-10 bg-transparent border-0 cursor-pointer p-0"
-                      />
-                      <input
-                        type="text"
-                        value={newThemeColor}
-                        onChange={(e) => setNewThemeColor(e.target.value)}
-                        className="w-full px-2 py-1 bg-stone-950 border border-stone-800 text-xs font-mono text-center text-stone-200 rounded-lg outline-none"
-                      />
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setNewThemeBgMode('dark')}
-                        className={`w-1/2 rounded-lg text-[10px] font-bold ${
-                          newThemeBgMode === 'dark' ? 'bg-zinc-800 text-white border border-stone-700' : 'text-stone-500 border border-stone-800'
-                        }`}
-                      >
-                        Obsidian
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewThemeBgMode('light')}
-                        className={`w-1/2 rounded-lg text-[10px] font-bold ${
-                          newThemeBgMode === 'light' ? 'bg-stone-100 text-zinc-950 border border-stone-300' : 'text-stone-500 border border-stone-800'
-                        }`}
-                      >
-                        Alabaster
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={((vaultData.customThemeConfigs || []).length + 4) >= 10 || !newThemeName}
-                    onClick={() => {
-                      handleAddCustomTheme(newThemeName, newThemeColor, newThemeBgMode);
-                      setNewThemeName('');
-                    }}
-                    className="w-full py-2 bg-stone-950 hover:bg-stone-900 border border-amber-500/20 text-xs font-bold text-amber-500 rounded-lg font-mono tracking-wide transition-all disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    + Save Custom Theme Composition to Vault
-                  </button>
-
-                  {/* List custom themes */}
-                  {(vaultData.customThemeConfigs || []).length > 0 && (
-                    <div className="space-y-1.5 pt-2 max-h-32 overflow-y-auto">
-                      {(vaultData.customThemeConfigs || []).map((t) => {
-                        const themeKey = `custom-${t.id}`;
-                        const isCur = vaultData.theme.palette === themeKey;
-                        return (
-                          <div key={t.id} className="flex items-center justify-between bg-stone-950/20 p-2 rounded-lg text-xs border border-stone-850/50">
-                            <span className="font-semibold text-stone-300">
-                              {t.name} ({t.bgMode === 'dark' ? 'Dark' : 'Light'})
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: t.primaryColor }} />
-                              <button
-                                type="button"
-                                onClick={() => handleChangeTheme({ mode: t.bgMode, palette: themeKey as any })}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  isCur ? 'bg-amber-500 text-zinc-950' : 'bg-transparent text-stone-500 border border-stone-800 hover:text-stone-300'
-                                }`}
+                      {!limitReached ? (
+                        <div className="space-y-3.5">
+                          {/* Top row: Name & Fonts */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-400 font-mono block mb-1">Theme Title name</label>
+                              <input
+                                type="text"
+                                placeholder={`e.g. Royal ${themeModeTab === 'dark' ? 'Obsidian' : 'Emerald'}`}
+                                value={newThemeName}
+                                onChange={(e) => setNewThemeName(e.target.value)}
+                                className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-stone-200 rounded-lg outline-none focus:border-amber-500 transition-all font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-400 font-mono block mb-1">Typography Font pairing</label>
+                              <select
+                                value={newThemeFontStyle}
+                                onChange={(e) => setNewThemeFontStyle(e.target.value as any)}
+                                className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-stone-200 rounded-lg outline-none cursor-pointer"
                               >
-                                Activate
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveCustomTheme(t.id)}
-                                className="text-red-500 hover:text-red-400 text-[10px] font-bold uppercase shrink-0 px-2"
-                              >
-                                Delete
-                              </button>
+                                <option value="classic-inter">Classic Inter (Corporate Display)</option>
+                                <option value="cyber-mono">Digital Mono (Tactical Ledger)</option>
+                                <option value="serif-editorial">Serif Editorial (Heritage Wealth)</option>
+                              </select>
                             </div>
                           </div>
-                        );
-                      })}
+
+                          {/* Middle row: Background, Text, Accent, Button Colors */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-950/40 p-3 rounded-lg border border-stone-850">
+                            {/* Background Color */}
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Background bg</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="color"
+                                  value={newThemeBgColor}
+                                  onChange={(e) => setNewThemeBgColor(e.target.value)}
+                                  className="h-7 w-7 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={newThemeBgColor}
+                                  onChange={(e) => setNewThemeBgColor(e.target.value)}
+                                  className="w-full px-1.5 py-0.5 bg-stone-950 border border-stone-800 text-[10px] font-mono text-center text-stone-300 rounded outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Text Color */}
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Secondary text</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="color"
+                                  value={newThemeTextColor}
+                                  onChange={(e) => setNewThemeTextColor(e.target.value)}
+                                  className="h-7 w-7 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={newThemeTextColor}
+                                  onChange={(e) => setNewThemeTextColor(e.target.value)}
+                                  className="w-full px-1.5 py-0.5 bg-stone-950 border border-stone-800 text-[10px] font-mono text-center text-stone-300 rounded outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Accent Color / Status Bar */}
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Accent & Bars</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="color"
+                                  value={newThemeColor}
+                                  onChange={(e) => setNewThemeColor(e.target.value)}
+                                  className="h-7 w-7 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={newThemeColor}
+                                  onChange={(e) => setNewThemeColor(e.target.value)}
+                                  className="w-full px-1.5 py-0.5 bg-stone-950 border border-stone-800 text-[10px] font-mono text-center text-stone-300 rounded outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Buttons and Cards BG */}
+                            <div>
+                              <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Buttons & Cards</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="color"
+                                  value={newThemeBtnBgColor}
+                                  onChange={(e) => setNewThemeBtnBgColor(e.target.value)}
+                                  className="h-7 w-7 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={newThemeBtnBgColor}
+                                  onChange={(e) => setNewThemeBtnBgColor(e.target.value)}
+                                  className="w-full px-1.5 py-0.5 bg-stone-950 border border-stone-800 text-[10px] font-mono text-center text-stone-300 rounded outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Extra block for button active text coloration */}
+                          <div className="flex items-center gap-3 bg-stone-950/20 px-3 py-1.5 rounded-lg border border-stone-850/60 max-w-xs">
+                            <span className="text-[10px] font-mono text-stone-500 uppercase font-bold">Button text color:</span>
+                            <input
+                              type="color"
+                              value={newThemeBtnTextColor}
+                              onChange={(e) => setNewThemeBtnTextColor(e.target.value)}
+                              className="h-6 w-6 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+                            />
+                            <input
+                              type="text"
+                              value={newThemeBtnTextColor}
+                              onChange={(e) => setNewThemeBtnTextColor(e.target.value)}
+                              className="w-18 px-1 py-0.5 bg-stone-950 border border-stone-800 text-[10px] font-mono text-center text-stone-300 rounded outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!newThemeName}
+                            onClick={() => {
+                              handleAddCustomTheme(
+                                newThemeName, 
+                                newThemeColor, 
+                                themeModeTab, 
+                                newThemeBgColor, 
+                                newThemeTextColor, 
+                                newThemeBtnBgColor, 
+                                newThemeBtnTextColor, 
+                                newThemeFontStyle
+                              );
+                              setNewThemeName('');
+                            }}
+                            className="w-full py-2.5 bg-stone-950 hover:bg-stone-900 border border-amber-500/20 text-xs font-bold text-amber-500 rounded-xl font-mono tracking-wide transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                          >
+                            + Deploy & Activate Custom Theme Composition
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-[11px] text-red-400 font-semibold flex items-center justify-center gap-1.5">
+                          <span>⚙ Limit Enforced: Delete an existing custom {themeModeTab} theme first to add more.</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
+
               </div>
             )}
 
@@ -1965,66 +2455,148 @@ export default function App() {
             {settingsTab === 'rules' && (
               <div className="space-y-4 animate-fade-in">
                 
-                {/* 1. Custom Monthly Savings Target override */}
-                <div className="p-4 bg-stone-500/5 rounded-2xl border border-stone-850/40 space-y-2">
-                  <span className="text-xs font-bold text-stone-300 block">Configure Global Saving Sink Stream Goal Amount</span>
-                  <p className="text-[10px] text-stone-500">
-                    Set how much money you intentionally save/invest from whatever you earn per month. This adjusts the real-time sink stream rates!
-                  </p>
-                  <div className="flex gap-2 items-center max-w-sm">
-                    <span className="font-bold font-mono text-stone-400 text-sm">{(vaultData.currencySymbol || '₹')}</span>
-                    <input
-                      type="number"
-                      placeholder="e.g. 25000"
-                      value={vaultData.customSavingsGoalAmt || ''}
-                      onChange={(e) => handleUpdateSavingsRule(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-stone-950 border border-stone-800 text-xs text-white rounded-lg font-mono outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* 2. Custom Dynamic Overhead Outlays toggle overrides */}
-                <div className="p-4 bg-stone-500/5 rounded-2xl border border-stone-850/40 space-y-2">
-                  <span className="text-xs font-bold text-stone-300 block">Sink stream Deficit / Expense Override (Fixed vs Dynamic)</span>
-                  <p className="text-[10px] text-stone-500">
-                    By default, Echelon computes real-time outlays dynamically from current recorded budget ledger expenditures for this month. 
-                    You may explicitly lock it to a static monthly value to simulate steady-state run rates.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateSinkStreamOverride(undefined)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                        vaultData.userOverriddenExpenses === undefined 
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-400' 
-                          : 'border-stone-800 text-stone-500'
-                      }`}
-                    >
-                      Dynamic (From Budget Transactions)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateSinkStreamOverride(vaultData.userOverriddenExpenses || 15000)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                        vaultData.userOverriddenExpenses !== undefined 
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-400' 
-                          : 'border-stone-800 text-stone-400'
-                      }`}
-                    >
-                      Fixed Static Lock
-                    </button>
-                  </div>
-                  {vaultData.userOverriddenExpenses !== undefined && (
-                    <div className="flex gap-2 items-center max-w-sm pt-2 animate-fade-in">
-                      <span className="text-xs text-stone-400">Locked Expense Amount:</span>
-                      <input
-                        type="number"
-                        value={vaultData.userOverriddenExpenses}
-                        onChange={(e) => handleUpdateSinkStreamOverride(parseFloat(e.target.value) || 0)}
-                        className="w-24 px-2 py-1 bg-stone-950 border border-stone-800 text-xs text-white rounded outline-none font-mono font-bold"
-                      />
+                {/* 1. Echelon Velocity Profiler Consolidated Parameters Card */}
+                <div className="p-5 bg-stone-500/[0.03] border border-stone-850 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-stone-850 pb-2.5">
+                    <div>
+                      <span className="text-xs uppercase font-extrabold tracking-widest text-amber-500 font-mono block">Echelon Velocity Profiler</span>
+                      <p className="text-[10px] text-stone-500">Modulate your balance sheet, safety shield, and saving streams</p>
                     </div>
-                  )}
+                    <span className="text-[10px] font-mono bg-amber-500/10 border border-amber-500/20 text-amber-500 px-2.5 py-0.5 rounded uppercase font-black">
+                      Decisive Engine
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* 1. Monthly income */}
+                    <div>
+                      <label className="text-[9.5px] uppercase font-mono font-bold text-stone-400 block mb-1.5">
+                        1. Monthly Salary Inflow
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-stone-500">{(vaultData.currencySymbol || '₹')}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          placeholder="Salary"
+                          value={vaultData.monthlyEarnings}
+                          onChange={(e) => handleSetMonthlyEarnings(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 2. Monthly Expenses */}
+                    <div>
+                      <label className="text-[9.5px] uppercase font-mono font-bold text-stone-400 block mb-1.5">
+                        2. Monthly Outflow
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-stone-500">{(vaultData.currencySymbol || '₹')}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          placeholder="Expenses"
+                          value={vaultData.userOverriddenExpenses ?? 15000}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            handleUpdateUserOverriddenExpenses(val);
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateUserOverriddenExpenses(undefined)}
+                          className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
+                            vaultData.userOverriddenExpenses === undefined
+                              ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                              : 'bg-stone-950 border-stone-850 text-stone-500'
+                          }`}
+                        >
+                          Dynamic
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateUserOverriddenExpenses(vaultData.userOverriddenExpenses || 15000)}
+                          className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
+                            vaultData.userOverriddenExpenses !== undefined
+                              ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                              : 'bg-stone-950 border-stone-850 text-stone-400'
+                          }`}
+                        >
+                          Static Lock
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3. Desired Safety Buffer */}
+                    <div>
+                      <label className="text-[9.5px] uppercase font-mono font-bold text-stone-400 block mb-1.5">
+                        3. Desired Buffer Size
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-stone-500">{(vaultData.currencySymbol || '₹')}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          placeholder="Buffer Goal"
+                          value={vaultData.customSavingsGoalAmt ?? 5000}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            handleUpdateCustomSavingsGoalAmt(val);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Anchor Safety Shield to Assets Checklist */}
+                  <div className="space-y-1.5 pt-2 border-t border-stone-850/60">
+                    <span className="text-[9px] uppercase font-mono font-bold text-stone-400 block flex justify-between items-center">
+                      <span>🛡️ Anchor Safety Shield To Asset</span>
+                      <span className="text-[8px] text-stone-500 lowercase">(select only one checkbox to link)</span>
+                    </span>
+                    <div className="max-h-[140px] overflow-y-auto border border-stone-800 bg-stone-950 rounded-xl p-2 space-y-1 scrollbar-thin">
+                      {vaultData.assets.map(asset => {
+                        const isSelected = (vaultData.taggedBufferAssetIds || []).includes(asset.id) || vaultData.taggedBufferAssetId === asset.id;
+                        return (
+                          <label 
+                            key={asset.id} 
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all border text-[11px] font-mono select-none ${
+                              isSelected 
+                                ? 'bg-amber-500/[0.04] border-amber-500/25 text-amber-500 font-bold' 
+                                : 'bg-stone-900/10 border-transparent hover:bg-stone-900/30 text-stone-400 hover:text-stone-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <input
+                                type="checkbox"
+                                className="accent-amber-500 rounded cursor-pointer h-3.5 w-3.5 flex-shrink-0"
+                                checked={isSelected}
+                                onChange={() => {
+                                  // SINGLE SELECTION ONLY!
+                                  // Clicking a checkbox deselects all others & sets this one as selected, or deselects this one.
+                                  const nextIds = isSelected ? [] : [asset.id];
+                                  handleUpdateTaggedBufferAssetIds(nextIds);
+                                  handleUpdateTaggedBufferAssetId(nextIds[0] || '');
+                                }}
+                              />
+                              <span className="font-semibold truncate">{asset.name}</span>
+                            </div>
+                            <span className="font-bold text-[10px] pl-1 text-stone-200">
+                              {(vaultData.currencySymbol || '₹')}{Math.floor(asset.currentValue).toLocaleString('en-IN')}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {vaultData.assets.length === 0 && (
+                        <div className="text-[10px] italic text-stone-500 text-center py-4">No assets available to tag.</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 3. Budget categories list for threshold alert editing */}

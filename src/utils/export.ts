@@ -416,6 +416,32 @@ export function generateHTMLReport(state: EchelonState, monthName: string = 'Cur
     </tbody>
   </table>
 
+  ${(state.acknowledgedAlerts && state.acknowledgedAlerts.length > 0) ? `
+  <h2>Audit & Safeguard Alerts History Log</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Trigger Date</th>
+        <th>Alert Name</th>
+        <th>Details of Warning Trigger</th>
+        <th>Linked Fund Anchor</th>
+        <th class="text-right">Closing Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${state.acknowledgedAlerts.map(a => `
+        <tr>
+          <td>${new Date(a.date).toLocaleDateString('en-IN')} ${new Date(a.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</td>
+          <td><strong style="color: #dc2626;">${a.ruleName}</strong></td>
+          <td>${a.message}</td>
+          <td>${a.linkedFundName || 'Multiple/All Assets'}</td>
+          <td class="text-right card-mono">₹${(a.closingBalance || 0).toLocaleString('en-IN')}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
   <div style="margin-top: 50px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px dashed #e5e7eb; padding-top: 20px;">
     Echelon Confidential Vault Encryption Status: INTEGRITY_OK &bull; SECURED CLIENT-SIDE STORAGE ONLY
   </div>

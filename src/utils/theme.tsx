@@ -29,7 +29,122 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
   // Base configuration
   let tokens: ColorTokens;
 
+  // Intercept custom themes immediately
+  if (theme.palette && theme.palette.startsWith('custom-')) {
+    tokens = {
+      bg: 'custom-theme-bg',
+      card: 'custom-theme-card border shadow-md',
+      cardHover: 'custom-theme-card-hover',
+      textPrimary: 'custom-theme-text-primary',
+      textSecondary: 'custom-theme-text-secondary',
+      accent: 'custom-theme-accent font-semi',
+      accentHover: 'hover:opacity-90',
+      accentText: 'custom-theme-accent-text',
+      border: 'custom-theme-border',
+      borderAccent: 'custom-theme-border-accent',
+      buttonBg: 'custom-theme-button-bg font-semi hover:opacity-95',
+      glow: 'shadow-[0_0_15px_rgba(245,158,11,0.15)]',
+      badgeBg: 'custom-theme-badge-bg border',
+      badgeText: 'custom-theme-badge-text'
+    };
+    return tokens;
+  }
+
   switch (theme.palette) {
+    case 'skyblue':
+      tokens = {
+        bg: 'bg-sky-100',
+        card: 'bg-white border-sky-200/80 shadow-sm',
+        cardHover: 'hover:bg-sky-50/50 hover:border-sky-400',
+        textPrimary: 'text-sky-950',
+        textSecondary: 'text-sky-800/80',
+        accent: 'bg-sky-600 text-white font-medium',
+        accentHover: 'hover:bg-sky-700',
+        accentText: 'text-sky-600',
+        border: 'border-sky-200',
+        borderAccent: 'border-sky-500',
+        buttonBg: 'bg-sky-200 hover:bg-sky-300 text-sky-950',
+        glow: 'shadow-[0_0_15px_rgba(14,165,233,0.15)]',
+        badgeBg: 'bg-sky-100 text-sky-800 border border-sky-200',
+        badgeText: 'text-sky-950'
+      };
+      break;
+
+    case 'pure-light':
+      tokens = {
+        bg: 'bg-stone-50',
+        card: 'bg-white border-stone-200 shadow-sm',
+        cardHover: 'hover:bg-stone-50/50 hover:border-stone-400',
+        textPrimary: 'text-stone-900',
+        textSecondary: 'text-stone-600',
+        accent: 'bg-stone-900 text-white font-medium',
+        accentHover: 'hover:bg-stone-850',
+        accentText: 'text-stone-900',
+        border: 'border-stone-200',
+        borderAccent: 'border-stone-900',
+        buttonBg: 'bg-stone-200 hover:bg-stone-300 text-stone-900',
+        glow: 'shadow-[0_0_10px_rgba(41,37,36,0.05)]',
+        badgeBg: 'bg-stone-100 text-stone-900 border border-stone-200',
+        badgeText: 'text-stone-900'
+      };
+      break;
+
+    case 'sand-drift':
+      tokens = {
+        bg: 'bg-[#fdf6e3]',
+        card: 'bg-[#f5ecdf] border-[#e4d4c1] shadow-sm',
+        cardHover: 'hover:bg-[#eae0d2] hover:border-[#b58900]',
+        textPrimary: 'text-[#2c2421]',
+        textSecondary: 'text-[#5c4f48]',
+        accent: 'bg-[#b58900] text-white font-medium',
+        accentHover: 'hover:bg-[#a07800]',
+        accentText: 'text-[#b58900]',
+        border: 'border-[#e4d4c1]',
+        borderAccent: 'border-[#b58900]',
+        buttonBg: 'bg-[#ebd9c1] hover:bg-[#e0caa9] text-[#2c2421]',
+        glow: 'shadow-[0_0_12px_rgba(181,137,0,0.15)]',
+        badgeBg: 'bg-[#f5ecdf] text-[#b58900] border border-[#e4d4c1]',
+        badgeText: 'text-[#2c2421]'
+      };
+      break;
+
+    case 'lavender-blush':
+      tokens = {
+        bg: 'bg-[#faf5ff]',
+        card: 'bg-white border-purple-200 shadow-md',
+        cardHover: 'hover:bg-purple-50/50 hover:border-purple-400',
+        textPrimary: 'text-[#3b0764]',
+        textSecondary: 'text-[#581c87]',
+        accent: 'bg-[#8b5cf6] text-white font-medium',
+        accentHover: 'hover:bg-[#7c3aed]',
+        accentText: 'text-[#8b5cf6]',
+        border: 'border-purple-200',
+        borderAccent: 'border-purple-500',
+        buttonBg: 'bg-purple-100 hover:bg-purple-200 text-[#3b0764]',
+        glow: 'shadow-[0_0_15px_rgba(139,92,246,0.15)]',
+        badgeBg: 'bg-purple-50 text-purple-750 border border-purple-200',
+        badgeText: 'text-[#3b0764]'
+      };
+      break;
+
+    case 'mint-fresh':
+      tokens = {
+        bg: 'bg-[#f0fdf4]',
+        card: 'bg-white border-emerald-200 shadow-sm',
+        cardHover: 'hover:bg-emerald-50/50 hover:border-emerald-400',
+        textPrimary: 'text-emerald-950',
+        textSecondary: 'text-emerald-800',
+        accent: 'bg-emerald-600 text-white font-medium',
+        accentHover: 'hover:bg-emerald-700',
+        accentText: 'text-emerald-600',
+        border: 'border-emerald-200',
+        borderAccent: 'border-emerald-500',
+        buttonBg: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950',
+        glow: 'shadow-[0_0_15px_rgba(16,185,129,0.12)]',
+        badgeBg: 'bg-emerald-50 text-emerald-900 border border-emerald-200',
+        badgeText: 'text-emerald-950'
+      };
+      break;
     case 'stealth-gold':
       tokens = {
         bg: 'bg-[#08080a]',
