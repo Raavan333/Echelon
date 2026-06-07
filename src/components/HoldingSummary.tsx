@@ -46,6 +46,7 @@ interface HoldingSummaryProps {
   onUpdateTaggedBufferAsset?: (id: string) => void;
   taggedBufferAssetIds?: string[];
   onUpdateTaggedBufferAssets?: (ids: string[]) => void;
+  onChangeTab?: (tab: 'portfolio' | 'assets' | 'loans' | 'budget' | 'ai') => void;
 }
 
 type PeriodType = 'hour' | 'day' | 'month' | 'year' | '5year';
@@ -68,6 +69,7 @@ export default function HoldingSummary({
   onUpdateTaggedBufferAsset,
   taggedBufferAssetIds = [],
   onUpdateTaggedBufferAssets,
+  onChangeTab,
 }: HoldingSummaryProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [forecastYears, setForecastYears] = useState<number>(3);
@@ -101,7 +103,10 @@ export default function HoldingSummary({
     budgetAmount
   );
 
-  const monthlyGrowthPct = totalPortfolioValue > 0 ? (rates.netPerMonth / totalPortfolioValue) * 100 : 0;
+  const monthlyGrowthDenom = totalPortfolioValue !== 0 
+    ? Math.abs(totalPortfolioValue) 
+    : (totalAssetsVal > 0 ? totalAssetsVal : 1);
+  const monthlyGrowthPct = (rates.netPerMonth / monthlyGrowthDenom) * 100;
 
   // Reset offset with changes to anchor state
   useEffect(() => {
@@ -110,9 +115,8 @@ export default function HoldingSummary({
 
   // High-frequency dividend compiling ticks
   useEffect(() => {
-    if (rates.netPerYear <= 0) return;
     const interval = setInterval(() => {
-      // 20 updates per second
+      // 20 updates per second (acts as positive compound interest OR real-time loss tracking!)
       setLiveNetOffset(prev => prev + (rates.netPerYear / (365.25 * 24 * 60 * 60 * 20)));
     }, 50);
     return () => clearInterval(interval);
@@ -332,9 +336,13 @@ export default function HoldingSummary({
 
           {/* div:nth-of-type(2) - Parameters Display */}
           <div className="space-y-3 bg-stone-500/[0.02] border border-stone-850 p-3.5 rounded-2xl flex flex-col justify-between">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
-                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+            <div className="grid grid-cols-3 gap-2 text-center text-stone-300">
+              <div 
+                onClick={() => onChangeTab && onChangeTab('budget')}
+                className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl cursor-pointer hover:border-amber-500/40 transition-all hover:bg-stone-900/60 group"
+                title="Click to manage Budget & Salary"
+              >
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1 group-hover:text-amber-400 font-bold">
                   Salary Inflow
                 </span>
                 <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
@@ -342,8 +350,12 @@ export default function HoldingSummary({
                 </p>
               </div>
 
-              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
-                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+              <div 
+                onClick={() => onChangeTab && onChangeTab('budget')}
+                className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl cursor-pointer hover:border-amber-500/40 transition-all hover:bg-stone-900/60 group"
+                title="Click to view Outflow Sinks"
+              >
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1 group-hover:text-amber-400 font-bold">
                   Outflow/Sinks
                 </span>
                 <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
@@ -354,8 +366,12 @@ export default function HoldingSummary({
                 </span>
               </div>
 
-              <div className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl">
-                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1">
+              <div 
+                onClick={() => onChangeTab && onChangeTab('budget')}
+                className="bg-stone-900/40 p-2 border border-stone-850/60 rounded-xl cursor-pointer hover:border-amber-500/40 transition-all hover:bg-stone-900/60 group"
+                title="Click to configure emergency buffer targets"
+              >
+                <span className="text-[8px] uppercase font-mono font-bold text-stone-500 block mb-1 group-hover:text-amber-400 font-bold">
                   Buffer Target
                 </span>
                 <p className={`text-xs font-bold font-mono ${tokens.textPrimary}`}>
@@ -376,24 +392,38 @@ export default function HoldingSummary({
                 Change Link
               </button>
             </span>
-            <div className="bg-stone-950 p-3 rounded-xl border border-stone-850 flex items-center justify-between">
+            <div 
+              onClick={() => onChangeTab && onChangeTab('assets')}
+              className="bg-stone-950 p-3 rounded-xl border border-stone-850 cursor-pointer hover:border-amber-500/40 transition-all hover:bg-stone-900/20"
+              title="Click to view assets & allocations"
+            >
               {(() => {
-                const taggedAsset = assets.find(a => activeTaggedIds.includes(a.id));
-                if (taggedAsset) {
+                const selectedAssets = assets.filter(a => activeTaggedIds.includes(a.id));
+                const totalTaggedVal = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+                if (selectedAssets.length > 0) {
                   return (
-                    <div className="flex items-center justify-between w-full font-mono text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                        <span className="font-semibold text-stone-200 truncate">{taggedAsset.name}</span>
+                    <div className="w-full font-mono text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                          <span className="font-semibold text-stone-200 truncate">
+                            {selectedAssets.length === 1 ? selectedAssets[0].name : `${selectedAssets.length} Anchored Funds`}
+                          </span>
+                        </div>
+                        <span className="font-extrabold text-amber-500 pl-1">
+                          {currencySymbol}{Math.floor(totalTaggedVal).toLocaleString('en-IN')}
+                        </span>
                       </div>
-                      <span className="font-extrabold text-amber-500 pl-1">
-                        {currencySymbol}{Math.floor(taggedAsset.currentValue).toLocaleString('en-IN')}
-                      </span>
+                      {selectedAssets.length > 1 && (
+                        <div className="text-[9px] text-stone-500 truncate whitespace-nowrap pl-4">
+                          {selectedAssets.map(a => a.name).join(' + ')}
+                        </div>
+                      )}
                     </div>
                   );
                 } else {
                   return (
-                    <div className="text-[10px] italic text-rose-400 font-sans flex items-center justify-center gap-1 w-full py-1 text-center">
+                    <div className="text-[10px] italic text-rose-400 font-sans flex items-center justify-center gap-1 w-full py-1 text-center bg-stone-950">
                       <span>⚠ Portfolio Treasury Exposed (No Active Anchor)</span>
                     </div>
                   );
@@ -429,8 +459,10 @@ export default function HoldingSummary({
 
                   {selectedAssets.length > 0 ? (
                     <div className="space-y-2">
-                      <div className="flex justify-between items-center text-[10px] font-mono text-stone-400 bg-stone-900/30 px-2 py-1.5 rounded-lg border border-stone-850/60">
-                        <span className="font-semibold truncate max-w-[140px]">{selectedAssets[0]?.name}</span>
+                      <div className="flex justify-between items-center text-[10px] font-mono text-stone-400 bg-stone-900/30 px-2 py-1.5 rounded-lg border border-stone-850/60 font-mono">
+                        <span className="font-semibold truncate max-w-[140px] font-mono">
+                          {selectedAssets.length === 1 ? selectedAssets[0]?.name : `${selectedAssets.length} Anchored Funds`}
+                        </span>
                         <span>
                           {currencySymbol}{Math.floor(totalTaggedVal).toLocaleString('en-IN')} / {currencySymbol}{bufferGoalAmt.toLocaleString('en-IN')}
                         </span>
@@ -542,7 +574,7 @@ export default function HoldingSummary({
                 {/* Visual weighted portfolio APY center metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-tight">
                   <span className="text-[9px] uppercase font-bold text-stone-500 font-mono">Weighted Yield</span>
-                  <span className={`text-sm font-black font-mono ${tokens.textPrimary}`}>
+                  <span className={`text-sm font-black font-mono ${blendedAPY >= 0 ? tokens.textPrimary : 'text-rose-500 dark:text-rose-400 font-bold'}`}>
                     {blendedAPY.toFixed(1)}% APY
                   </span>
                 </div>
@@ -580,7 +612,20 @@ export default function HoldingSummary({
               };
 
               return (
-                <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 group">
+                <div 
+                  key={idx} 
+                  onClick={() => {
+                    if (onChangeTab) {
+                      if (c.label === 'Lent (Contracts)') {
+                        onChangeTab('loans');
+                      } else {
+                        onChangeTab('assets');
+                      }
+                    }
+                  }}
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 group cursor-pointer hover:bg-stone-500/[0.03] p-1 rounded-xl transition-all"
+                  title={`Click to analyze detailed ${c.label} holdings`}
+                >
                   {/* Category bullet with label */}
                   <div className="flex items-center gap-2 shrink-0 min-w-[120px]">
                     <div className="h-2.5 w-2.5 rounded-full animate-pulse" style={{ backgroundColor: c.color }} />

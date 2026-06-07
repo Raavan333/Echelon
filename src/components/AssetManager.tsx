@@ -23,6 +23,72 @@ import {
 import { EchelonTheme, Asset, AssetType, FundTransfer } from '../types';
 import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
 
+export function getIndianStockTaxDetails(asset: Asset, currentDateStr: string = '2026-06-05', usdRate: number = 83.5, currencySymbol: string = '₹') {
+  if (asset.type !== AssetType.STOCK && asset.type !== AssetType.EQUITY) return null;
+  if (!asset.purchasePrice || !asset.purchaseDate) return null;
+
+  const buyDate = new Date(asset.purchaseDate);
+  const curDate = new Date(currentDateStr);
+  
+  // Calculate holding period in days
+  const diffTime = Math.max(0, curDate.getTime() - buyDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  const isUS = asset.isUSAsset === true;
+  const isLTCG = isUS ? (diffDays > 730) : (diffDays > 365);
+  
+  // Convert values to base currency if US asset
+  const baseCurrentValue = isUS ? (asset.currentValue * usdRate) : asset.currentValue;
+  const basePurchasePrice = isUS ? (asset.purchasePrice * usdRate) : asset.purchasePrice;
+  const unrealisedGain = baseCurrentValue - basePurchasePrice;
+  
+  let taxApplied = 0;
+  let taxDetails = '';
+  
+  if (unrealisedGain > 0) {
+    if (isUS) {
+      if (isLTCG) {
+        // LTCG on US assets: 12.5% tax with rebate/indexation
+        const rebateAmt = currencySymbol === '$' ? (125000 / usdRate) : 125000;
+        const taxableGains = Math.max(0, unrealisedGain - rebateAmt);
+        taxApplied = taxableGains * 0.125;
+        taxDetails = `US LTCG (12.5% tax above rebate)`;
+      } else {
+        // STCG on US assets: taxed under slab rates. Income < 12L means 0% slab!
+        taxApplied = 0;
+        taxDetails = `US STCG (0% slab rate as income < 12L)`;
+      }
+    } else {
+      if (isLTCG) {
+        // Indian LTCG: ₹1.25 lakhs rebate, then 12.5%
+        const rebateAmt = currencySymbol === '$' ? (125000 / usdRate) : 125000;
+        const taxableGains = Math.max(0, unrealisedGain - rebateAmt);
+        taxApplied = taxableGains * 0.125;
+        taxDetails = `LTCG (12.5% tax above ₹1.25L rebate)`;
+      } else {
+        // Indian STCG: 20%
+        taxApplied = unrealisedGain * 0.20;
+        taxDetails = `STCG (20% tax on Indian delivery)`;
+      }
+    }
+  } else {
+    taxDetails = `Capital Loss (No Tax)`;
+  }
+
+  return {
+    holdingDays: diffDays,
+    isLTCG,
+    unrealisedGain,
+    taxApplied,
+    taxDetails,
+    isUS,
+    nativeCurrency: isUS ? '$' : currencySymbol,
+    nativeCurrentValue: asset.currentValue,
+    nativePurchasePrice: asset.purchasePrice,
+    nativeUnrealisedGain: asset.currentValue - asset.purchasePrice
+  };
+}
+
 interface AssetManagerProps {
   theme: EchelonTheme;
   assets: Asset[];
@@ -31,6 +97,7 @@ interface AssetManagerProps {
   onUpdateAsset?: (id: string, asset: Omit<Asset, 'id' | 'lastUpdated'>) => void;
   onRemoveAsset: (id: string) => void;
   currencySymbol?: string;
+  usdConversionRate?: number;
   onOpenSettings?: () => any;
   selectedProgressBarStyle?: 'ultra-thin' | 'neon-glow' | 'carbon-solid';
   activeAccentColor?: string;
@@ -46,6 +113,7 @@ export default function AssetManager({
   onUpdateAsset,
   onRemoveAsset,
   currencySymbol = '₹',
+  usdConversionRate = 83.5,
   onOpenSettings,
   selectedProgressBarStyle = 'ultra-thin',
   activeAccentColor,
@@ -67,6 +135,17 @@ export default function AssetManager({
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  // Stock details form states
+  const [purchaseDate, setPurchaseDate] = useState<string>('');
+  const [purchasePrice, setPurchasePrice] = useState<string>('');
+  const [isUSAsset, setIsUSAsset] = useState<boolean>(false);
+
+  // Bond details form states
+  const [bondRiskFactor, setBondRiskFactor] = useState<string>('AAA');
+  const [bondInterestPeriod, setBondInterestPeriod] = useState<'monthly' | 'quarterly' | 'annually'>('monthly');
+  const [bondInterestAmount, setBondInterestAmount] = useState<string>('');
+  const [bondInterestPayoutDate, setBondInterestPayoutDate] = useState<string>('15');
+
   // Editing state
   const [editId, setEditId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -74,6 +153,15 @@ export default function AssetManager({
   const [editGrowthRate, setEditGrowthRate] = useState<string>('');
   const [editStartDate, setEditStartDate] = useState<string>('');
   const [editEndDate, setEditEndDate] = useState<string>('');
+
+  // Edit states for Stocks/Bonds
+  const [editPurchaseDate, setEditPurchaseDate] = useState<string>('');
+  const [editPurchasePrice, setEditPurchasePrice] = useState<string>('');
+  const [editIsUSAsset, setEditIsUSAsset] = useState<boolean>(false);
+  const [editBondRiskFactor, setEditBondRiskFactor] = useState<string>('AAA');
+  const [editBondInterestPeriod, setEditBondInterestPeriod] = useState<'monthly' | 'quarterly' | 'annually'>('monthly');
+  const [editBondInterestAmount, setEditBondInterestAmount] = useState<string>('');
+  const [editBondInterestPayoutDate, setEditBondInterestPayoutDate] = useState<string>('15');
 
   // Shifter Form state
   const [shifterSourceId, setShifterSourceId] = useState<string>('');
@@ -190,6 +278,9 @@ export default function AssetManager({
     e.preventDefault();
     if (!name || !institution || !currentValue) return;
 
+    const isStockOrEquity = type === AssetType.STOCK || type === AssetType.EQUITY;
+    const isBond = type === AssetType.BOND;
+
     onAddAsset({
       name,
       institution,
@@ -200,6 +291,15 @@ export default function AssetManager({
       notes,
       startDate: (type === AssetType.FD || type === AssetType.BOND) ? startDate : undefined,
       endDate: (type === AssetType.FD || type === AssetType.BOND) ? endDate : undefined,
+      purchaseDate: isStockOrEquity ? purchaseDate : undefined,
+      purchasePrice: isStockOrEquity ? (parseFloat(purchasePrice) || 0) : undefined,
+      bondRiskFactor: isBond ? bondRiskFactor : undefined,
+      bondInterestPeriod: isBond ? bondInterestPeriod : undefined,
+      bondInterestAmount: isBond ? (parseFloat(bondInterestAmount) || 0) : undefined,
+      bondInterestPayoutDate: isBond ? bondInterestPayoutDate : undefined,
+      bondPaymentAlertEnabled: isBond ? true : undefined,
+      bondPaymentsConfirmed: isBond ? [] : undefined,
+      isUSAsset: isStockOrEquity ? isUSAsset : undefined,
     });
 
     // Reset fields
@@ -212,6 +312,13 @@ export default function AssetManager({
     setNotes('');
     setStartDate('');
     setEndDate('');
+    setPurchaseDate('');
+    setPurchasePrice('');
+    setIsUSAsset(false);
+    setBondRiskFactor('AAA');
+    setBondInterestPeriod('monthly');
+    setBondInterestAmount('');
+    setBondInterestPayoutDate('15');
     setShowAddForm(false);
   };
 
@@ -220,6 +327,13 @@ export default function AssetManager({
     setEditValue(asset.currentValue.toString());
     setEditReturns(asset.realisedReturns.toString());
     setEditGrowthRate((asset.annualGrowthRate ?? 12).toString());
+    setEditPurchaseDate(asset.purchaseDate || '');
+    setEditPurchasePrice(asset.purchasePrice?.toString() || '');
+    setEditIsUSAsset(asset.isUSAsset || false);
+    setEditBondRiskFactor(asset.bondRiskFactor || 'AAA');
+    setEditBondInterestPeriod(asset.bondInterestPeriod || 'monthly');
+    setEditBondInterestAmount(asset.bondInterestAmount?.toString() || '');
+    setEditBondInterestPayoutDate(asset.bondInterestPayoutDate || '15');
   };
 
   const handleSaveEdit = (id: string) => {
@@ -227,7 +341,29 @@ export default function AssetManager({
     const ret = parseFloat(editReturns);
     const growth = parseFloat(editGrowthRate);
     if (!isNaN(val) && !isNaN(ret)) {
-      onUpdateAssetValue(id, val, ret, isNaN(growth) ? undefined : growth);
+      const asset = assets.find(a => a.id === id);
+      if (asset) {
+        const isStockOrEquity = asset.type === AssetType.STOCK || asset.type === AssetType.EQUITY;
+        const isBond = asset.type === AssetType.BOND;
+        
+        if (onUpdateAsset) {
+          onUpdateAsset(id, {
+            ...asset,
+            currentValue: val,
+            realisedReturns: ret,
+            annualGrowthRate: isNaN(growth) ? undefined : growth,
+            purchaseDate: isStockOrEquity ? editPurchaseDate : undefined,
+            purchasePrice: isStockOrEquity ? (parseFloat(editPurchasePrice) || 0) : undefined,
+            isUSAsset: isStockOrEquity ? editIsUSAsset : undefined,
+            bondRiskFactor: isBond ? editBondRiskFactor : undefined,
+            bondInterestPeriod: isBond ? editBondInterestPeriod : undefined,
+            bondInterestAmount: isBond ? (parseFloat(editBondInterestAmount) || 0) : undefined,
+            bondInterestPayoutDate: isBond ? editBondInterestPayoutDate : undefined,
+          });
+        } else {
+          onUpdateAssetValue(id, val, ret, isNaN(growth) ? undefined : growth);
+        }
+      }
       setEditId(null);
     }
   };
@@ -363,14 +499,16 @@ export default function AssetManager({
             </div>
 
             <div>
-              <label htmlFor="asset-form-valuation" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Current Valuation</label>
+              <label htmlFor="asset-form-valuation" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">
+                Current Valuation ({(type === AssetType.STOCK || type === AssetType.EQUITY) && isUSAsset ? '$' : currencySymbol})
+              </label>
               <input
                 type="number"
                 id="asset-form-valuation"
                 required
                 min="0"
                 step="0.01"
-                placeholder={`${currencySymbol} Amount`}
+                placeholder={`${(type === AssetType.STOCK || type === AssetType.EQUITY) && isUSAsset ? '$' : currencySymbol} Amount`}
                 value={currentValue}
                 onChange={(e) => setCurrentValue(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -378,12 +516,14 @@ export default function AssetManager({
             </div>
 
             <div>
-              <label htmlFor="asset-form-returns" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Realised P&L / Returns To Date</label>
+              <label htmlFor="asset-form-returns" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">
+                Realised P&L / Returns To Date ({(type === AssetType.STOCK || type === AssetType.EQUITY) && isUSAsset ? '$' : currencySymbol})
+              </label>
               <input
                 type="number"
                 id="asset-form-returns"
                 step="0.01"
-                placeholder={`${currencySymbol} Profit/Interest Realised`}
+                placeholder={`${(type === AssetType.STOCK || type === AssetType.EQUITY) && isUSAsset ? '$' : currencySymbol} Profit/Interest Realised`}
                 value={realisedReturns}
                 onChange={(e) => setRealisedReturns(e.target.value)}
                 className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
@@ -432,6 +572,117 @@ export default function AssetManager({
                     onChange={(e) => setEndDate(e.target.value)}
                     className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
                   />
+                </div>
+              </>
+            )}
+
+            {/* Stocks / Equities specific input options */}
+            {(type === AssetType.STOCK || type === AssetType.EQUITY) && (
+              <>
+                <div className="md:col-span-2 flex items-center gap-2 py-2 bg-stone-500/5 px-3 rounded-xl border border-stone-800/40 my-1">
+                  <input
+                    type="checkbox"
+                    id="asset-form-us-asset-checkbox"
+                    checked={isUSAsset}
+                    onChange={(e) => setIsUSAsset(e.target.checked)}
+                    className="rounded border-zinc-750 bg-stone-903 bg-stone-900 text-amber-500 h-4 w-4 cursor-pointer focus:ring-transparent"
+                  />
+                  <label htmlFor="asset-form-us-asset-checkbox" className="text-xs text-stone-300 font-bold select-none cursor-pointer">
+                    US Asset Market (Values are defined in USD & subject to US 24mo STCG/LTCG rules)
+                  </label>
+                </div>
+                <div>
+                  <label htmlFor="asset-form-purchase-date" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Purchase / Buying Date</label>
+                  <input
+                    type="date"
+                    id="asset-form-purchase-date"
+                    required
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="asset-form-purchase-price" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Buying Price / Cost Basis ({isUSAsset ? '$' : currencySymbol})</label>
+                  <input
+                    type="number"
+                    id="asset-form-purchase-price"
+                    required
+                    min="0"
+                    step="0.01"
+                    placeholder="Total cash paid to buy"
+                    value={purchasePrice}
+                    onChange={(e) => setPurchasePrice(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Bond specific input options */}
+            {type === AssetType.BOND && (
+              <>
+                <div>
+                  <label htmlFor="asset-form-bond-risk" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Bond Risk Factor (Credit Rating)</label>
+                  <select
+                    id="asset-form-bond-risk"
+                    required
+                    value={bondRiskFactor}
+                    onChange={(e) => setBondRiskFactor(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-950 font-semibold border ${tokens.border} rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500`}
+                  >
+                    <option value="AAA">AAA (Prime Investment Grade)</option>
+                    <option value="AA">AA (High Grade / Safe)</option>
+                    <option value="A">A (Upper Medium Grade)</option>
+                    <option value="BBB">BBB (Lower Medium Grade)</option>
+                    <option value="BB">BB (Non-Investment / Speculative)</option>
+                    <option value="B">B (Highly Speculative)</option>
+                    <option value="CCC">CCC (High Risk / Junk)</option>
+                    <option value="C">C (Default Imminent)</option>
+                    <option value="D">D (In Default)</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="asset-form-bond-int-period" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Interest Period</label>
+                  <select
+                    id="asset-form-bond-int-period"
+                    required
+                    value={bondInterestPeriod}
+                    onChange={(e) => setBondInterestPeriod(e.target.value as any)}
+                    className={`w-full px-3 py-2 bg-stone-950 font-semibold border ${tokens.border} rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500`}
+                  >
+                    <option value="monthly">Monthly Payout</option>
+                    <option value="quarterly">Quarterly Payout</option>
+                    <option value="annually">Annual Payout</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="asset-form-bond-int-amt" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Interest Paid per Period ({currencySymbol})</label>
+                  <input
+                    type="number"
+                    id="asset-form-bond-int-amt"
+                    required
+                    min="0"
+                    step="0.01"
+                    placeholder="Interest paid on date"
+                    value={bondInterestAmount}
+                    onChange={(e) => setBondInterestAmount(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-500/10 border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="asset-form-bond-payout-day" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Payout Day (Day of Month)</label>
+                  <select
+                    id="asset-form-bond-payout-day"
+                    required
+                    value={bondInterestPayoutDate}
+                    onChange={(e) => setBondInterestPayoutDate(e.target.value)}
+                    className={`w-full px-3 py-2 bg-stone-950 font-semibold border ${tokens.border} rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500`}
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                      <option key={day} value={day.toString()}>{day}th of the month</option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
@@ -489,155 +740,342 @@ export default function AssetManager({
               </tr>
             </thead>
             <tbody>
-              {assets.map((asset) => (
-                <tr key={asset.id} className="border-b border-stone-500/5 hover:bg-stone-500/5 group transition-colors">
-                  <td className="py-4 px-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-stone-500/10 flex items-center justify-center border border-stone-500/10">
-                        {getAssetIcon(asset.type)}
-                      </div>
-                      <div>
-                        <p className={`text-sm font-bold ${tokens.textPrimary}`}>{asset.name}</p>
-                        {asset.notes && <p className="text-[10px] text-stone-500 mb-1">{asset.notes}</p>}
-                        {(asset.type === AssetType.FD || asset.type === AssetType.BOND) && asset.startDate && asset.endDate && (() => {
-                          const start = new Date(asset.startDate).getTime();
-                          const end = new Date(asset.endDate).getTime();
-                          const now = Date.now();
-                          const total = end - start;
-                          let pct = 0;
-                          if (total > 0) {
-                            pct = Math.max(0, Math.min(100, ((now - start) / total) * 100));
-                          }
-                          const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-                          const isMatured = daysLeft <= 0;
-
-                          return (
-                            <div className="mt-1 max-w-xs space-y-0.5">
-                              <div className="flex items-center gap-2 text-[10px] font-mono">
-                                <span className={isMatured ? 'text-emerald-400 font-bold' : 'text-amber-500/80'}>
-                                  {isMatured ? '🎉 Matured' : `${pct.toFixed(0)}% Completed`}
-                                </span>
-                                <span className="text-stone-500">
-                                  {isMatured ? 'Liquid Available' : `• ${daysLeft} days left`}
-                                </span>
-                              </div>
-                              <div className="w-28 mt-1">
-                                {renderPremiumProgressBar(pct, selectedProgressBarStyle, isMatured ? 'bg-emerald-500' : 'bg-amber-500', activeAccentColor)}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                        {asset.type === AssetType.STOCK && (
-                          <div className="mt-1 flex items-center gap-1">
-                            <span className="h-1 w-1 rounded-full bg-amber-500 animate-pulse" />
-                            <span className="text-[9px] uppercase font-bold text-amber-500/80 font-mono tracking-wide">
-                              Volatile Market Asset
-                            </span>
+              {assets.map((asset) => {
+                const isEditing = editId === asset.id;
+                return (
+                  <React.Fragment key={asset.id}>
+                    <tr className={`border-b border-stone-500/5 hover:bg-stone-500/5 group transition-colors ${isEditing ? 'bg-amber-500/5' : ''}`}>
+                      <td className="py-4 px-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-stone-500/10 flex items-center justify-center border border-stone-500/10">
+                            {getAssetIcon(asset.type)}
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-bold ${tokens.textPrimary}`}>{asset.name}</p>
+                            {asset.notes && <p className="text-[10px] text-stone-500 mb-1">{asset.notes}</p>}
+                            {(asset.type === AssetType.FD || asset.type === AssetType.BOND) && asset.startDate && asset.endDate && (() => {
+                              const start = new Date(asset.startDate).getTime();
+                              const end = new Date(asset.endDate).getTime();
+                              const now = Date.now();
+                              const total = end - start;
+                              let pct = 0;
+                              if (total > 0) {
+                                pct = Math.max(0, Math.min(100, ((now - start) / total) * 100));
+                              }
+                              const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+                              const isMatured = daysLeft <= 0;
+
+                              return (
+                                <div className="mt-1 max-w-xs space-y-0.5">
+                                  <div className="flex items-center gap-2 text-[10px] font-mono">
+                                    <span className={isMatured ? 'text-emerald-400 font-bold' : 'text-amber-500/80'}>
+                                      {isMatured ? '🎉 Matured' : `${pct.toFixed(0)}% Completed`}
+                                    </span>
+                                    <span className="text-stone-500">
+                                      {isMatured ? 'Liquid Available' : `• ${daysLeft} days left`}
+                                    </span>
+                                  </div>
+                                  <div className="w-28 mt-1">
+                                    {renderPremiumProgressBar(pct, selectedProgressBarStyle, isMatured ? 'bg-emerald-500' : 'bg-amber-500', activeAccentColor)}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                            
+                            {/* Stocks / Equities specific Indian tax category indicators */}
+                            {(asset.type === AssetType.STOCK || asset.type === AssetType.EQUITY) && (
+                              asset.purchasePrice && asset.purchaseDate ? (() => {
+                                const taxInfo = getIndianStockTaxDetails(asset, new Date().toISOString().substring(0, 10), usdConversionRate, currencySymbol);
+                                if (!taxInfo) return null;
+                                const isLoss = taxInfo.unrealisedGain < 0;
+                                return (
+                                  <div className="mt-2 p-2 rounded-xl bg-stone-950/40 border border-stone-850/30 text-[10px] space-y-1 font-sans max-w-xs">
+                                    <div className="flex justify-between text-stone-500">
+                                      <span>Bought: {asset.purchaseDate} {taxInfo.isUS && <span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-1 rounded">US ASSET</span>}</span>
+                                      <span>
+                                        Cost: {taxInfo.isUS ? `$${asset.purchasePrice?.toLocaleString()}` : `${currencySymbol}${asset.purchasePrice?.toLocaleString()}`}
+                                        {taxInfo.isUS && currencySymbol !== '$' && ` (${currencySymbol}${Math.floor(asset.purchasePrice! * usdConversionRate).toLocaleString()})`}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between font-mono">
+                                      <span>Hold: <strong className="text-stone-300">{taxInfo.holdingDays} days</strong> ({taxInfo.isLTCG ? 'LTCG' : 'STCG'})</span>
+                                      <span>P&L:{' '}
+                                        <strong className={isLoss ? 'text-rose-400' : 'text-emerald-400'}>
+                                          {isLoss ? '' : '+'}
+                                          {taxInfo.isUS ? `$${taxInfo.nativeUnrealisedGain?.toLocaleString()}` : `${currencySymbol}${taxInfo.unrealisedGain?.toLocaleString()}`}
+                                          {taxInfo.isUS && currencySymbol !== '$' && ` (${currencySymbol}${Math.floor(taxInfo.unrealisedGain).toLocaleString()})`}
+                                        </strong>
+                                      </span>
+                                    </div>
+                                    <div className="border-t border-stone-900/60 pt-1 flex justify-between items-center text-stone-400">
+                                      <span className="text-[9px] truncate max-w-[140px]" title={taxInfo.taxDetails}>⚖️ {taxInfo.taxDetails}</span>
+                                      <span className="font-bold text-amber-500">Tax: {currencySymbol}{taxInfo.taxApplied.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                                    </div>
+                                  </div>
+                                ) as any;
+                              })() : (
+                                <div className="mt-1.5 p-1 px-2 rounded bg-stone-950/20 border border-stone-900 text-[9px] text-stone-500 italic max-w-xs">
+                                  ⚠️ Click edit to set purchase details for Capital Gains categorization.
+                                </div>
+                              )
+                            )}
+
+                            {/* Bonds specific details indicators */}
+                            {asset.type === AssetType.BOND && (
+                              asset.bondRiskFactor ? (() => {
+                                return (
+                                  <div className="mt-2 p-2 rounded-xl bg-stone-950/40 border border-stone-850/30 text-[10px] space-y-1 font-sans max-w-xs">
+                                    <div className="flex justify-between items-center text-stone-500">
+                                      <span>Risk Rating: <strong className="text-amber-500 font-bold px-1.5 py-0.2 bg-amber-500/10 rounded font-mono">{asset.bondRiskFactor}</strong></span>
+                                      <span>Payout Day: <strong className="text-stone-300 font-mono">{asset.bondInterestPayoutDate}th</strong></span>
+                                    </div>
+                                    <div className="flex justify-between font-mono text-stone-400">
+                                      <span>Payout Rate: <strong className="text-stone-300 uppercase text-[9px]">{asset.bondInterestPeriod}</strong></span>
+                                      <span>Est. Interest: <strong className="text-emerald-400">{currencySymbol}{asset.bondInterestAmount?.toLocaleString()}</strong></span>
+                                    </div>
+                                  </div>
+                                ) as any;
+                              })() : (
+                                <div className="mt-1.5 p-1 px-2 rounded bg-stone-950/20 border border-stone-900 text-[10px] text-stone-500 italic max-w-xs">
+                                  ⚠️ Click edit to configure Risk Credit Rating & payout frequency.
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-2 text-xs font-semibold text-stone-400">
+                        {asset.institution}
+                      </td>
+
+                      <td className="py-4 px-2">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${tokens.badgeBg}`}>
+                          {getAssetLabel(asset.type)}
+                        </span>
+                      </td>
+
+                      <td className="py-4 px-2 text-right text-xs font-bold font-mono text-stone-200">
+                        {asset.isUSAsset ? (
+                          <>
+                            <div className="text-stone-350 font-bold">${asset.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                            {currencySymbol !== '$' && (
+                              <div className="text-[10px] text-stone-500/90 font-medium font-mono leading-none mt-0.5">
+                                {currencySymbol}{Math.floor(asset.currentValue * usdConversionRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          `${currencySymbol}${asset.currentValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                         )}
-                      </div>
-                    </div>
-                  </td>
-                  
-                  <td className="py-4 px-2 text-xs font-semibold text-stone-400">
-                    {asset.institution}
-                  </td>
-                  
-                  <td className="py-4 px-2">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${tokens.badgeBg}`}>
-                      {getAssetLabel(asset.type)}
-                    </span>
-                  </td>
+                      </td>
 
-                  {/* Inline value manager */}
-                  <td className="py-4 px-2 text-right">
-                    {editId === asset.id ? (
-                      <input
-                        type="number"
-                        id={`edit-value-input-${asset.id}`}
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-24 px-2 py-1 bg-stone-500/15 border border-amber-500/30 text-stone-200 text-xs font-mono font-bold rounded focus:outline-none text-right"
-                      />
-                    ) : (
-                      <p className="text-sm font-bold font-mono text-stone-200">
-                        {currencySymbol}{asset.currentValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </p>
-                    )}
-                  </td>
+                      <td className={`py-4 px-2 text-right text-xs font-bold font-mono ${asset.realisedReturns >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {asset.isUSAsset ? (
+                          <>
+                            <div className={`${asset.realisedReturns >= 0 ? 'text-emerald-400' : 'text-rose-450 dark:text-rose-400'} font-bold`}>
+                              {asset.realisedReturns < 0 ? '-' : ''}${Math.abs(asset.realisedReturns).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                            {currencySymbol !== '$' && (
+                              <div className={`text-[10px] ${asset.realisedReturns >= 0 ? 'text-emerald-600/80' : 'text-rose-500/80'} font-medium font-mono leading-none mt-0.5`}>
+                                {asset.realisedReturns < 0 ? '-' : ''}{currencySymbol}{Math.floor(Math.abs(asset.realisedReturns) * usdConversionRate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          `${asset.realisedReturns < 0 ? '-' : ''}${currencySymbol}${Math.abs(asset.realisedReturns).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        )}
+                      </td>
 
-                  <td className="py-4 px-2 text-right">
-                    {editId === asset.id ? (
-                      <input
-                        type="number"
-                        id={`edit-returns-input-${asset.id}`}
-                        value={editReturns}
-                        onChange={(e) => setEditReturns(e.target.value)}
-                        className="w-24 px-2 py-1 bg-stone-500/15 border border-amber-500/30 text-stone-200 text-xs font-mono font-bold rounded focus:outline-none text-right"
-                      />
-                    ) : (
-                      <p className="text-sm font-bold font-mono text-emerald-500">
-                        {currencySymbol}{asset.realisedReturns.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* APY Growth Rate inline cell */}
-                  <td className="py-4 px-2 text-right">
-                    {editId === asset.id ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <input
-                          type="number"
-                          id={`edit-growth-input-${asset.id}`}
-                          value={editGrowthRate}
-                          onChange={(e) => setEditGrowthRate(e.target.value)}
-                          className="w-16 px-1.5 py-1 bg-stone-500/15 border border-amber-500/30 text-stone-200 text-xs font-mono font-bold rounded focus:outline-none text-right"
-                        />
-                        <span className="text-[10px] text-stone-500 font-mono">%</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-bold font-mono text-amber-500/90">
+                      <td className={`py-4 px-2 text-right text-sm font-bold font-mono ${(asset.annualGrowthRate !== undefined ? asset.annualGrowthRate : 12) >= 0 ? 'text-amber-500/90' : 'text-rose-400 dark:text-rose-500'}`}>
                         {asset.annualGrowthRate !== undefined ? asset.annualGrowthRate : 12}%
-                      </p>
-                    )}
-                  </td>
+                      </td>
 
-                  <td className="py-4 px-2">
-                    <div className="flex items-center justify-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
-                      {editId === asset.id ? (
-                        <button
-                          type="button"
-                          id={`save-asset-edit-btn-${asset.id}`}
-                          onClick={() => handleSaveEdit(asset.id)}
-                          className="px-2.5 py-1 bg-emerald-600 text-white rounded font-mono text-[10px] font-bold hover:bg-emerald-500"
-                        >
-                          Apply
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          id={`edit-asset-btn-${asset.id}`}
-                          onClick={() => handleStartEdit(asset)}
-                          className="h-7 w-7 rounded-lg hover:bg-stone-500/20 flex items-center justify-center text-stone-400 hover:text-stone-200"
-                          title="Manually Update Valuation"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      
-                      <button
-                        type="button"
-                        id={`delete-asset-btn-${asset.id}`}
-                        onClick={() => onRemoveAsset(asset.id)}
-                        className="h-7 w-7 rounded-lg hover:bg-red-500/20 flex items-center justify-center text-stone-400 hover:text-red-500"
-                        title="Delete Asset"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      <td className="py-4 px-2">
+                        <div className="flex items-center justify-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                          {isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditId(null)}
+                              className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded font-mono text-[10px] font-bold"
+                            >
+                              Close
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(asset)}
+                              className="h-7 w-7 rounded-lg hover:bg-stone-500/20 flex items-center justify-center text-stone-400 hover:text-stone-200"
+                              title="Update Asset Configurations"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          
+                          <button
+                            type="button"
+                            onClick={() => onRemoveAsset(asset.id)}
+                            className="h-7 w-7 rounded-lg hover:bg-red-500/20 flex items-center justify-center text-stone-400 hover:text-red-500"
+                            title="Delete Asset"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isEditing && (
+                      <tr className="border-b border-stone-800 bg-amber-500/5">
+                        <td colSpan={7} className="p-4 bg-zinc-950/80">
+                          <div className="space-y-4 max-w-4xl mx-auto">
+                            <div className="text-xs font-bold text-amber-500 uppercase font-mono tracking-wider">
+                              Update Holding Details for {asset.name}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              <div>
+                                <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Current Valuation</label>
+                                <input
+                                  type="number"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-mono focus:outline-none focus:border-amber-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Realised P&L / Earnings</label>
+                                <input
+                                  type="number"
+                                  value={editReturns}
+                                  onChange={(e) => setEditReturns(e.target.value)}
+                                  className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-mono focus:outline-none focus:border-amber-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">APY Growth Rate (%)</label>
+                                <input
+                                  type="number"
+                                  value={editGrowthRate}
+                                  onChange={(e) => setEditGrowthRate(e.target.value)}
+                                  className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-mono focus:outline-none focus:border-amber-500"
+                                />
+                              </div>
+                              
+                              {/* Stock specific Edit inputs */}
+                              {(asset.type === AssetType.STOCK || asset.type === AssetType.EQUITY) && (
+                                <>
+                                  <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2 py-2 bg-stone-500/5 px-3 rounded-xl border border-stone-850 my-1">
+                                    <input
+                                      type="checkbox"
+                                      id="edit-asset-form-us-asset-checkbox"
+                                      checked={editIsUSAsset}
+                                      onChange={(e) => setEditIsUSAsset(e.target.checked)}
+                                      className="rounded border-zinc-700 bg-stone-900 text-amber-500 h-4 w-4 cursor-pointer focus:ring-transparent"
+                                    />
+                                    <label htmlFor="edit-asset-form-us-asset-checkbox" className="text-xs text-stone-300 font-bold select-none cursor-pointer">
+                                      US Asset Market (Values are defined in USD & subject to US 24mo STCG/LTCG rules)
+                                    </label>
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Purchase Date</label>
+                                    <input
+                                      type="date"
+                                      value={editPurchaseDate}
+                                      onChange={(e) => setEditPurchaseDate(e.target.value)}
+                                      className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs focus:outline-none focus:border-amber-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Cost Basis Buying Price ({editIsUSAsset ? '$' : currencySymbol})</label>
+                                    <input
+                                      type="number"
+                                      value={editPurchasePrice}
+                                      onChange={(e) => setEditPurchasePrice(e.target.value)}
+                                      className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs focus:outline-none focus:border-amber-500"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Bond specific Edit inputs */}
+                              {asset.type === AssetType.BOND && (
+                                <>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Risk Credit Rating Rating</label>
+                                    <select
+                                      value={editBondRiskFactor}
+                                      onChange={(e) => setEditBondRiskFactor(e.target.value)}
+                                      className="w-full px-3 py-2 bg-stone-905 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                                    >
+                                      <option value="AAA">AAA (Prime)</option>
+                                      <option value="AA">AA (High Grade)</option>
+                                      <option value="A">A (Upper Medium)</option>
+                                      <option value="BBB">BBB (Lower Medium)</option>
+                                      <option value="BB">BB (Speculative)</option>
+                                      <option value="B">B (Highly Speculative)</option>
+                                      <option value="CCC">CCC (Junk)</option>
+                                      <option value="C">C (Imminent Default)</option>
+                                      <option value="D">D (In Default)</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Interest Period</label>
+                                    <select
+                                      value={editBondInterestPeriod}
+                                      onChange={(e) => setEditBondInterestPeriod(e.target.value as any)}
+                                      className="w-full px-3 py-2 bg-stone-905 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                                    >
+                                      <option value="monthly">Monthly</option>
+                                      <option value="quarterly">Quarterly</option>
+                                      <option value="annually">Annually</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Interest Amount Paid</label>
+                                    <input
+                                      type="number"
+                                      value={editBondInterestAmount}
+                                      onChange={(e) => setEditBondInterestAmount(e.target.value)}
+                                      className="w-full px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs focus:outline-none focus:border-amber-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Payout Day (Day of Month)</label>
+                                    <select
+                                      value={editBondInterestPayoutDate}
+                                      onChange={(e) => setEditBondInterestPayoutDate(e.target.value)}
+                                      className="w-full px-3 py-2 bg-stone-905 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                                    >
+                                      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                        <option key={day} value={day.toString()}>{day}th of the month</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-stone-900">
+                              <button
+                                type="button"
+                                onClick={() => setEditId(null)}
+                                className="px-3.5 py-2 bg-stone-900 hover:bg-stone-850 text-stone-400 hover:text-stone-300 rounded-xl text-xs font-mono font-bold"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEdit(asset.id)}
+                                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-xs font-mono font-black"
+                              >
+                                Apply Changes
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}

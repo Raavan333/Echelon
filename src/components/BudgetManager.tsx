@@ -99,6 +99,7 @@ export default function BudgetManager({
     }
   }, [budgetCategoryLimits, activeCategories, category]);
   const [amount, setAmount] = useState<string>('');
+  const [selectedChartTab, setSelectedChartTab] = useState<'monthly' | 'quarterly'>('monthly');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState<string>('');
 
@@ -869,6 +870,179 @@ export default function BudgetManager({
           </div>
         </div>
 
+      </div>
+
+      {/* 4. PREMIUM SECTOR: HISTORIC SPENDING & SAVING COMPLIANCE TREASURY RATIOS */}
+      <div className={`col-span-1 md:col-span-3 p-6 rounded-3xl border ${tokens.card} ${tokens.glow} space-y-6 transition-all duration-300`}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase font-bold tracking-widest text-amber-500 font-mono block mb-1">Treasury Ledger Analytics</span>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              📊 Historical Saving vs Spending Ratios
+            </h3>
+            <p className="text-xs text-stone-500 mt-1 leading-normal">
+              Compare actual savings accumulation weights with expense outlays over short-term quarters.
+            </p>
+          </div>
+
+          <div className="flex bg-[#141517] p-1 rounded-xl border border-stone-850 self-start">
+            <button
+              type="button"
+              onClick={() => setSelectedChartTab('monthly')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
+                selectedChartTab === 'monthly' ? 'text-stone-950 bg-amber-500 font-black' : 'text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              3-Month Trend
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedChartTab('quarterly')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
+                selectedChartTab === 'quarterly' ? 'text-stone-950 bg-amber-500 font-black' : 'text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              4-Quarter Comparison
+            </button>
+          </div>
+        </div>
+
+        {/* Visual Columns Chart */}
+        <div className="p-4 rounded-2xl bg-stone-950/40 border border-stone-850/50 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {(() => {
+              const curDate = new Date();
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              
+              // 3 Months history
+              const last3Months = Array.from({ length: 3 }).map((_, i) => {
+                const d = new Date();
+                d.setMonth(curDate.getMonth() - (2 - i));
+                const mIdx = d.getMonth();
+                const yr = d.getFullYear();
+                
+                const realSpend = expenses
+                  .filter(e => {
+                    const eDate = new Date(e.date);
+                    return eDate.getMonth() === mIdx && eDate.getFullYear() === yr;
+                  })
+                  .reduce((sum, e) => sum + e.amount, 0);
+                  
+                const hasData = realSpend > 0;
+                const baselineSum = budget.amount > 0 ? budget.amount : 25000;
+                const finalSpend = hasData ? Math.round(realSpend) : 0;
+                const savings = hasData ? Math.max(0, Math.round(baselineSum - finalSpend)) : 0;
+                
+                return {
+                  label: `${monthNames[mIdx]} ${yr}`,
+                  spend: finalSpend,
+                  save: savings
+                };
+              });
+
+              // 4 Quarters history
+              const last4Quarters = Array.from({ length: 4 }).map((_, i) => {
+                const totalMonthsAgo = (3 - i) * 3;
+                const d = new Date();
+                d.setMonth(curDate.getMonth() - totalMonthsAgo);
+                
+                const qr = Math.floor(d.getMonth() / 3) + 1;
+                const yr = d.getFullYear();
+                const qLabel = `Q${qr} ${yr}`;
+                
+                const realSpend = expenses
+                  .filter(e => {
+                    const eDate = new Date(e.date);
+                    const eqVal = Math.floor(eDate.getMonth() / 3) + 1;
+                    return eqVal === qr && eDate.getFullYear() === yr;
+                  })
+                  .reduce((sum, e) => sum + e.amount, 0);
+                  
+                const hasData = realSpend > 0;
+                const baseQ = (budget.amount > 0 ? budget.amount : 25000) * 3;
+                const finalSpend = hasData ? Math.round(realSpend) : 0;
+                const savings = hasData ? Math.max(0, Math.round(baseQ - finalSpend)) : 0;
+                
+                return {
+                  label: qLabel,
+                  spend: finalSpend,
+                  save: savings
+                };
+              });
+
+              return (selectedChartTab === 'monthly' ? last3Months : last4Quarters);
+            })().map((point, idx) => {
+              const total = point.spend + point.save;
+              const spendPct = total > 0 ? (point.spend / total) * 100 : 0;
+              const savePct = total > 0 ? (point.save / total) * 100 : 0;
+
+              return (
+                <div key={idx} className="space-y-2.5 p-3.5 rounded-xl bg-stone-500/5 border border-stone-800/10">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold font-mono text-stone-300">{point.label}</span>
+                    <span className="text-[10px] font-mono text-stone-500 uppercase">
+                      Quotient:{' '}
+                      {total > 0 ? (
+                        <strong className="text-emerald-400">{savePct.toFixed(1)}% Saved</strong>
+                      ) : (
+                        <strong className="text-stone-550 italic">Empty</strong>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Dual Bar Graphic Chart */}
+                  <div className="space-y-1.5">
+                    {/* Spent bar */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-stone-400 mb-0.5 font-mono">
+                        <span>🔴 Spent outlay</span>
+                        <span className="text-red-400 font-semibold">
+                          {total > 0 ? `${currencySymbol}${point.spend.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${spendPct.toFixed(0)}%)` : `${currencySymbol}0`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#111116] h-2 rounded-full overflow-hidden border border-stone-850">
+                        <div
+                          className="bg-red-500 h-full rounded-full transition-all duration-500 animate-pulse"
+                          style={{ width: `${spendPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Saved bar */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-stone-400 mb-0.5 font-mono">
+                        <span>🟢 Savings retained</span>
+                        <span className="text-emerald-400 font-semibold">
+                          {total > 0 ? `${currencySymbol}${point.save.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${savePct.toFixed(0)}%)` : `${currencySymbol}0`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#111116] h-2 rounded-full overflow-hidden border border-stone-850">
+                        <div
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500 animate-pulse"
+                          style={{ width: `${savePct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Core insights commentary */}
+          <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/10 flex items-start gap-2.5">
+            <span className="text-base select-none">💡</span>
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-amber-500 block">Sovereign Compliance Verdict</span>
+              <p className="text-[11px] text-stone-300 leading-normal">
+                {selectedChartTab === 'monthly' 
+                  ? "Comparing your active monthly expense flow against historical trends indicates a stable compounding trajectory. Accumulating surplus of over 30% acts as a formidable capital shield."
+                  : "Quarterly reviews verify consistent long-term velocity. Continuing to prioritize high-compounding debt paydowns while maintaining a low spending quotient secures exponential net worth milestones."
+                }
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>

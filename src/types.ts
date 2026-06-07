@@ -47,6 +47,15 @@ export interface Asset {
   sweepInLinkedAssetId?: string; // Linked bank balance Asset ID
   maturityPenaltyRate?: number; // Break penalty percentage, e.g. 1%
   isMatured?: boolean;
+  purchaseDate?: string;         // Date or ISO String of purchase (purchased time)
+  purchasePrice?: number;        // Cost basis/buying price
+  bondRiskFactor?: string;       // AAA, AA, A, BBB, BB, B+, etc.
+  bondInterestPeriod?: 'monthly' | 'quarterly' | 'annually';
+  bondInterestAmount?: number;
+  bondInterestPayoutDate?: string; // e.g. "15" or specific ISO date
+  bondPaymentAlertEnabled?: boolean;
+  bondPaymentsConfirmed?: string[]; // Array of YYYY-MM configurations confirmed
+  isUSAsset?: boolean;
 }
 
 export interface Loan {
@@ -192,6 +201,7 @@ export interface EchelonState {
   compiledInsightsText?: string;
   taggedBufferAssetId?: string;
   taggedBufferAssetIds?: string[];
+  usdConversionRate?: number;
 }
 
 export interface FundTransfer {

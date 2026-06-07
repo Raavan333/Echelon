@@ -108,7 +108,8 @@ export function calculateWealthRates(
   totalPortfolioValue: number,
   userOverriddenExpenses?: number,
   customSavingsGoalAmt?: number,
-  budgetAmount?: number
+  budgetAmount?: number,
+  usdRate?: number
 ): WealthRates {
   // 1. Earned Income flows:
   // Recurring monthly earnings
@@ -123,7 +124,10 @@ export function calculateWealthRates(
         : asset.type === AssetType.BOND ? 0.085
         : (asset.type === AssetType.EQUITY || asset.type === AssetType.STOCK) ? 0.12 
         : 0);
-    assetAnnualPassiveYield += asset.currentValue * rate;
+    const convertedValue = asset.isUSAsset 
+      ? asset.currentValue * (usdRate !== undefined ? usdRate : 83.5)
+      : asset.currentValue;
+    assetAnnualPassiveYield += convertedValue * rate;
   });
 
   // Lent loans compound interest yield per year

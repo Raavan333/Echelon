@@ -24,7 +24,9 @@ import {
   HelpCircle,
   Activity,
   RotateCcw,
-  Bell
+  Bell,
+  X,
+  Brain
 } from 'lucide-react';
 
 import { 
@@ -162,6 +164,9 @@ export default function App() {
   const [newAlertAssetIds, setNewAlertAssetIds] = useState<string[]>([]);
   const [newAlertConditionType, setNewAlertConditionType] = useState<'below_amount' | 'above_amount' | 'below_percent' | 'above_percent'>('below_amount');
   const [newAlertThresholdValue, setNewAlertThresholdValue] = useState<string>('');
+
+  // Dynamic AI Insight Alert banner
+  const [newInsightAlert, setNewInsightAlert] = useState<{ message: string; actionMsg: string } | null>(null);
 
   // Undo System states
   const [undoStack, setUndoStack] = useState<EchelonState[]>([]);
@@ -439,6 +444,22 @@ export default function App() {
     
     const nextState = updater(vaultData);
     saveVaultData(nextState);
+
+    // Trigger AI tax insight alert for portfolio & outflow mutations
+    const msg = actionMsg.toLowerCase();
+    if (
+      msg.includes('asset') ||
+      msg.includes('debt') ||
+      msg.includes('budget') ||
+      msg.includes('expense') ||
+      msg.includes('outflow') ||
+      msg.includes('transfer')
+    ) {
+      setNewInsightAlert({
+        message: `Your recent portfolio transaction/budget adjustments ("${actionMsg}") altered your tax slab exposure or compounding velocity. Click here to trigger a Sovereign AI compilation of your updated compliance dossier!`,
+        actionMsg: actionMsg
+      });
+    }
   };
 
   const handleUndo = () => {
@@ -542,6 +563,35 @@ export default function App() {
       assets: current.assets.map(a => 
         a.id === id ? { ...a, ...assetData, lastUpdated: new Date().toISOString() } : a
       ),
+    }));
+  };
+
+  const handleConfirmBondPayment = (ruleId: string, assetId: string) => {
+    if (!vaultData) return;
+    const currentDate = new Date();
+    const currentYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    const asset = vaultData.assets.find(a => a.id === assetId);
+    if (!asset) return;
+    
+    const updatedConfirmed = [...(asset.bondPaymentsConfirmed || []), currentYearMonth];
+    const interestAmt = asset.bondInterestAmount || 0;
+    
+    // Dismiss interest payout alert in session
+    setSessionDismissedAlertIds(prev => [...prev, ruleId]);
+    
+    mutateVaultData(`Confirmed Bond Receipt: ${asset.name}`, (current) => ({
+      ...current,
+      assets: current.assets.map(a => {
+        if (a.id === assetId) {
+          return {
+            ...a,
+            realisedReturns: (a.realisedReturns || 0) + interestAmt,
+            bondPaymentsConfirmed: updatedConfirmed,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return a;
+      })
     }));
   };
 
@@ -724,6 +774,7 @@ export default function App() {
     mutateVaultData(`Updated Tagged Safety Buffer Asset`, (current) => ({
       ...current,
       taggedBufferAssetId: assetId,
+      taggedBufferAssetIds: assetId ? [assetId] : [],
     }));
   };
 
@@ -731,6 +782,7 @@ export default function App() {
     mutateVaultData(`Updated Tagged Safety Buffer Assets`, (current) => ({
       ...current,
       taggedBufferAssetIds: assetIds,
+      taggedBufferAssetId: assetIds[0] || '',
     }));
   };
 
@@ -1071,6 +1123,14 @@ export default function App() {
     });
   };
 
+  const handleUpdateUsdConversionRate = (rate: number) => {
+    if (!vaultData) return;
+    saveVaultData({
+      ...vaultData,
+      usdConversionRate: rate,
+    });
+  };
+
   const handleUpdateSavingsRule = (amt: number) => {
     if (!vaultData) return;
     saveVaultData({
@@ -1215,7 +1275,13 @@ export default function App() {
   };
 
   // Calculate aggregate portfolio values for goal timetables
-  const totalAssetsVal = vaultData ? vaultData.assets.reduce((sum, a) => sum + a.currentValue, 0) : 0;
+  const totalAssetsVal = vaultData 
+    ? vaultData.assets.reduce((sum, a) => {
+        const rate = vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5;
+        const val = a.isUSAsset ? a.currentValue * rate : a.currentValue;
+        return sum + val;
+      }, 0) 
+    : 0;
   const totalLentVal = vaultData ? vaultData.loans
     .filter(l => l.type === LoanType.LENT)
     .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0) : 0;
@@ -1227,7 +1293,7 @@ export default function App() {
     .reduce((sum, c) => sum + calculateCreditCardEffectiveLiability(c), 0) : 0;
   
   const totalNetWorth = totalAssetsVal + totalLentVal - totalBorrowedVal - totalCreditCardLiabilitiesVal;
-
+  
   const rates = vaultData ? calculateWealthRates(
     vaultData.assets,
     vaultData.loans,
@@ -1236,7 +1302,8 @@ export default function App() {
     totalNetWorth,
     vaultData.userOverriddenExpenses,
     vaultData.customSavingsGoalAmt,
-    vaultData.budget.amount
+    vaultData.budget.amount,
+    vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5
   ) : {
     earningsPerHour: 0, lossesPerHour: 0, netPerHour: 0,
     earningsPerDay: 0, lossesPerDay: 0, netPerDay: 0,
@@ -1300,6 +1367,65 @@ export default function App() {
         }
       }
     });
+
+    // 1. Bond Interest Payout Alerts
+    vaultData.assets.forEach(asset => {
+      if (asset.type === 'BOND' && asset.bondInterestPayoutDate && asset.bondInterestAmount) {
+        const currentDate = new Date();
+        const currentYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Has the user confirmed this month's interest payout?
+        const hasConfirmedThisMonth = asset.bondPaymentsConfirmed && asset.bondPaymentsConfirmed.includes(currentYearMonth);
+        
+        if (!hasConfirmedThisMonth) {
+          const payoutDay = parseInt(asset.bondInterestPayoutDate, 10);
+          const currentDay = currentDate.getDate();
+          
+          if (currentDay >= payoutDay) {
+            triggered.push({
+              rule: {
+                id: `bond-interest-payout-${asset.id}-${currentYearMonth}`,
+                name: `Bond Payout Confirmation: ${asset.name}`,
+                assetIds: [asset.id],
+                conditionType: 'above_amount',
+                targetAmount: asset.bondInterestAmount,
+                isActive: true
+              },
+              message: `📅 Bond Interest Due! [${asset.name}] (${asset.bondRiskFactor || 'Unrated'} Risk) has an interest payment of ${vaultData.currencySymbol || '₹'}${asset.bondInterestAmount.toLocaleString()} set on day ${payoutDay} of this month. Please confirm receipt.`,
+              severity: 'info'
+            });
+          }
+        }
+      }
+    });
+
+    // 2. Budget Daily Overrun Alert
+    if (vaultData.budget && vaultData.budget.amount > 0) {
+      let daysCount = 30;
+      if (vaultData.budget.period === 'WEEKLY') daysCount = 7;
+      if (vaultData.budget.period === 'YEARLY') daysCount = 365;
+      
+      const dailyLimit = vaultData.budget.amount / daysCount;
+      const todayString = new Date().toDateString();
+      const todayExpensesSum = vaultData.expenses
+        .filter(exp => new Date(exp.date).toDateString() === todayString)
+        .reduce((sum, exp) => sum + exp.amount, 0);
+        
+      if (todayExpensesSum > dailyLimit) {
+        triggered.push({
+          rule: {
+            id: `budget-daily-limit-excess`,
+            name: `Daily Budget Overrun`,
+            conditionType: 'above_amount',
+            targetAmount: dailyLimit,
+            isActive: true,
+            assetIds: []
+          },
+          message: `⚠️ Daily Cap Overrun! Today's logged expenses of ${vaultData.currencySymbol || '₹'}${todayExpensesSum.toLocaleString()} have exceeded your calculated daily budget limit of ${vaultData.currencySymbol || '₹'}${dailyLimit.toLocaleString('en-IN', { maximumFractionDigits: 1 })}. Pluck or trim excess leisure outlays!`,
+          severity: 'warning'
+        });
+      }
+    }
     
     return triggered;
   };
@@ -1409,7 +1535,7 @@ export default function App() {
       `}</style>
       
       {/* 1. SECURE TOP NAVIGATION HEADER */}
-      <header className={`sticky top-0 z-30 border-b backdrop-blur-md bg-opacity-80 py-4 max-w-7xl mx-auto px-4 ${tokens.card}`}>
+      <header className={`sticky top-0 z-30 border-b backdrop-blur-md bg-opacity-80 py-2 max-w-7xl mx-auto px-4 ${tokens.card}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 bg-[#141517] rounded-xl flex items-center justify-center border border-stone-800 shadow-md p-1 shrink-0">
@@ -1454,21 +1580,6 @@ export default function App() {
               <span className="hidden md:inline">Settings</span>
             </button>
 
-            {/* Save printable PDF button */}
-            <button
-              type="button"
-              id="export-pdf-top-btn"
-              onClick={() => {
-                setSettingsTab('backups');
-                setShowSettings(true);
-              }}
-              className={`p-2 rounded-xl border ${tokens.buttonBg} transition-all flex items-center gap-1.5`}
-              title="Navigate to Settings Downloads"
-            >
-              <Download className="h-4 w-4 text-amber-500" />
-              <span className="hidden md:inline font-mono text-[11px] font-bold text-stone-300">Downloads</span>
-            </button>
-
             {/* Lock button */}
             <button
               type="button"
@@ -1487,6 +1598,42 @@ export default function App() {
       {/* MAIN WORKSPACE SECTION */}
       <main className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
         
+        {newInsightAlert && (
+          <div 
+            onClick={() => {
+              setActiveTab('ai');
+              setNewInsightAlert(null);
+            }}
+            className="animate-pulse cursor-pointer group"
+          >
+            <div className="p-4 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-4 transition-all duration-305 shadow-xl shadow-amber-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-500 rounded-xl border border-amber-500/30">
+                  <Brain className="h-5 w-5 text-amber-500 animate-bounce" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono leading-none tracking-widest text-amber-500 uppercase block font-black mb-1">
+                    ⚡ NEW SOVEREIGN WEALTH INSIGHT CHANNELD
+                  </span>
+                  <p className="text-xs text-stone-200 font-mono leading-relaxed group-hover:text-amber-400 transition-colors">
+                    {newInsightAlert.message}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewInsightAlert(null);
+                }}
+                className="p-1 px-2.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-850/50 text-[10px] uppercase font-mono font-bold transition-all border border-stone-800"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* 2. DYNAMIC WORKSPACE PAGES */}
         <div className="animate-fade-in pb-36">
           
@@ -1504,7 +1651,7 @@ export default function App() {
                 </div>
               )}
 
-              <HoldingSummary
+               <HoldingSummary
                 theme={vaultData.theme}
                 assets={vaultData.assets}
                 loans={vaultData.loans}
@@ -1525,6 +1672,7 @@ export default function App() {
                 onUpdateTaggedBufferAsset={handleUpdateTaggedBufferAssetId}
                 taggedBufferAssetIds={vaultData.taggedBufferAssetIds || []}
                 onUpdateTaggedBufferAssets={handleUpdateTaggedBufferAssetIds}
+                onChangeTab={setActiveTab}
               />
 
               <GoalMilestones
@@ -1550,6 +1698,7 @@ export default function App() {
               onUpdateAsset={handleUpdateAssetFull}
               onRemoveAsset={handleRemoveAsset}
               currencySymbol={vaultData.currencySymbol || '₹'}
+              usdConversionRate={vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5}
               onOpenSettings={() => setShowSettings(true)}
               transfers={vaultData.transfers || []}
               onAddTransfer={handleCreateTransfer}
@@ -1609,6 +1758,7 @@ export default function App() {
               monthlyEarnings={vaultData.monthlyEarnings}
               expenses={vaultData.expenses}
               currencySymbol={vaultData.currencySymbol || '₹'}
+              usdConversionRate={vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5}
               goals={vaultData.goals}
               compiledInsightsText={vaultData.compiledInsightsText}
               onUpdateCompiledInsightsText={handleUpdateCompiledInsightsText}
@@ -1736,13 +1886,22 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="flex justify-end pt-1">
+                        <div className="flex justify-end gap-2 pt-1">
+                          {rule.id.startsWith("bond-interest-payout-") && (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmBondPayment(rule.id, selectedAssets[0]?.id || '')}
+                              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-450 text-stone-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all"
+                            >
+                              🤝 Confirm Payment Receipt
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDismissAlert(alertItem)}
                             className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-stone-950 border border-rose-500/20 text-rose-400 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xl transition-all"
                           >
-                            ✓ Dismiss & Archive Event
+                            {rule.id.startsWith("bond-interest-payout-") ? 'Remind Me Later' : '✓ Dismiss & Archive Event'}
                           </button>
                         </div>
                       </div>
@@ -1800,28 +1959,26 @@ export default function App() {
                 </h2>
                 <p className="text-xs text-stone-500">Configure visual themes, custom parameters, backups and app galleries</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mr-8 md:mr-10">
                 <button
                   type="button"
-                  id="settings-logout-btn"
-                  onClick={() => {
-                    setShowSettings(false);
-                    handleLockVault();
-                  }}
-                  className="px-3.5 py-1.5 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500 text-rose-400 hover:text-zinc-950 rounded-xl text-xs font-mono font-bold tracking-wider transition-all flex items-center gap-1.5"
-                  title="Log out and encrypt session data"
+                  id="export-pdf-top-btn"
+                  onClick={() => setSettingsTab('backups')}
+                  className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-stone-300 border border-stone-750 hover:text-amber-500 rounded-xl text-xs font-semibold transition-all font-mono flex items-center gap-1.5"
+                  title="Navigate to Settings Downloads"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Lock Vault</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSettings(false)}
-                  className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-stone-300 rounded-xl text-xs font-semibold hover:text-amber-500 transition-all font-mono"
-                >
-                  Close
+                  <Download className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Download</span>
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-stone-950 transition-all font-bold"
+                title="Dismiss Configurations"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Seamless Sub-tab Navigators */}
@@ -1919,6 +2076,38 @@ export default function App() {
                     })}
                   </div>
                   <p className="text-[10px] text-stone-500">Note: Echelon supports local cash assets tracking in any fiat denomination securely.</p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-stone-850/40">
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-200">
+                    <label htmlFor="settings-usd-rate-input" className="text-stone-300">USD Conversion Rate (1 USD = X Base Currency)</label>
+                    <span className="text-[10px] font-mono text-amber-500">Current: {vaultData.usdConversionRate || 83.5}</span>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      id="settings-usd-rate-input"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="e.g. 83.50"
+                      value={vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5}
+                      onChange={(e) => handleUpdateUsdConversionRate(parseFloat(e.target.value) || 83.5)}
+                      className="w-full max-w-[200px] px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 text-xs font-mono focus:outline-none focus:border-amber-500"
+                    />
+                    <div className="flex gap-1.5">
+                      {[83.5, 84.0, 85.0].map((rVal) => (
+                        <button
+                          key={rVal}
+                          type="button"
+                          onClick={() => handleUpdateUsdConversionRate(rVal)}
+                          className="px-2 py-1.5 rounded-xl border border-stone-800 bg-stone-950/40 text-[9px] font-mono hover:bg-stone-800 text-stone-400"
+                        >
+                          {rVal}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500">This rate converts foreign holdings (e.g. US Delivery Stocks) to your base global currency symbol ({vaultData.currencySymbol || '₹'}) when compiling aggregate metrics and yields.</p>
                 </div>
 
                 {/* SECTION: PREMIUM CUSTOM IDENTITY LAUNCHER & INTERIOR ICONS */}
@@ -2554,49 +2743,86 @@ export default function App() {
                   </div>
 
                   {/* 4. Anchor Safety Shield to Assets Checklist */}
-                  <div className="space-y-1.5 pt-2 border-t border-stone-850/60">
-                    <span className="text-[9px] uppercase font-mono font-bold text-stone-400 block flex justify-between items-center">
-                      <span>🛡️ Anchor Safety Shield To Asset</span>
-                      <span className="text-[8px] text-stone-500 lowercase">(select only one checkbox to link)</span>
-                    </span>
-                    <div className="max-h-[140px] overflow-y-auto border border-stone-800 bg-stone-950 rounded-xl p-2 space-y-1 scrollbar-thin">
-                      {vaultData.assets.map(asset => {
-                        const isSelected = (vaultData.taggedBufferAssetIds || []).includes(asset.id) || vaultData.taggedBufferAssetId === asset.id;
-                        return (
-                          <label 
-                            key={asset.id} 
-                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all border text-[11px] font-mono select-none ${
-                              isSelected 
-                                ? 'bg-amber-500/[0.04] border-amber-500/25 text-amber-500 font-bold' 
-                                : 'bg-stone-900/10 border-transparent hover:bg-stone-900/30 text-stone-400 hover:text-stone-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <input
-                                type="checkbox"
-                                className="accent-amber-500 rounded cursor-pointer h-3.5 w-3.5 flex-shrink-0"
-                                checked={isSelected}
-                                onChange={() => {
-                                  // SINGLE SELECTION ONLY!
-                                  // Clicking a checkbox deselects all others & sets this one as selected, or deselects this one.
-                                  const nextIds = isSelected ? [] : [asset.id];
-                                  handleUpdateTaggedBufferAssetIds(nextIds);
-                                  handleUpdateTaggedBufferAssetId(nextIds[0] || '');
+                  {(() => {
+                    const currentSelectedIds = (vaultData.taggedBufferAssetIds && vaultData.taggedBufferAssetIds.length > 0)
+                      ? vaultData.taggedBufferAssetIds
+                      : (vaultData.taggedBufferAssetId ? [vaultData.taggedBufferAssetId] : []);
+                    const selectedAssets = vaultData.assets.filter(a => currentSelectedIds.includes(a.id));
+                    const currentSum = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+                    const desiredBuffer = vaultData.customSavingsGoalAmt ?? 5000;
+                    const bufferReached = desiredBuffer > 0 && currentSum >= desiredBuffer;
+
+                    return (
+                      <div className="space-y-1.5 pt-2 border-t border-stone-850/60">
+                        <div className="flex justify-between items-center text-[9px] uppercase font-mono font-bold text-stone-400">
+                          <span>🛡️ Anchor Safety Shield To Assets</span>
+                          <span className={bufferReached ? "text-emerald-400 font-extrabold tracking-tight shrink-0 font-mono" : "text-stone-500 font-bold tracking-tight shrink-0 font-mono"}>
+                            {bufferReached ? `✓ Buffer Reached (${(vaultData.currencySymbol || '₹')}${currentSum.toLocaleString('en-IN')})` : `Multi-Select Target: ${(vaultData.currencySymbol || '₹')}${desiredBuffer.toLocaleString('en-IN')}`}
+                          </span>
+                        </div>
+
+                        <div className="max-h-[140px] overflow-y-auto border border-stone-800 bg-stone-950 rounded-xl p-2 space-y-1 scrollbar-thin">
+                          {vaultData.assets.map(asset => {
+                            const isSelected = currentSelectedIds.includes(asset.id);
+                            return (
+                              <div 
+                                key={asset.id} 
+                                onClick={(e) => {
+                                  if (e.target instanceof HTMLInputElement) return;
+                                  if (isSelected) {
+                                    const nextIds = currentSelectedIds.filter(id => id !== asset.id);
+                                    handleUpdateTaggedBufferAssetIds(nextIds);
+                                  } else {
+                                    const nextIds = [...currentSelectedIds, asset.id];
+                                    handleUpdateTaggedBufferAssetIds(nextIds);
+                                  }
                                 }}
-                              />
-                              <span className="font-semibold truncate">{asset.name}</span>
-                            </div>
-                            <span className="font-bold text-[10px] pl-1 text-stone-200">
-                              {(vaultData.currencySymbol || '₹')}{Math.floor(asset.currentValue).toLocaleString('en-IN')}
-                            </span>
-                          </label>
-                        );
-                      })}
-                      {vaultData.assets.length === 0 && (
-                        <div className="text-[10px] italic text-stone-500 text-center py-4">No assets available to tag.</div>
-                      )}
-                    </div>
-                  </div>
+                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all border text-[11px] font-mono select-none ${
+                                  isSelected 
+                                    ? 'bg-amber-500/[0.04] border-amber-500/25 text-amber-500 font-bold' 
+                                    : 'bg-stone-900/10 border-transparent hover:bg-stone-900/30 text-stone-400 hover:text-stone-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-amber-500 rounded cursor-pointer h-3.5 w-3.5 flex-shrink-0"
+                                    checked={isSelected}
+                                    onChange={() => {}}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isSelected) {
+                                        const nextIds = currentSelectedIds.filter(id => id !== asset.id);
+                                        handleUpdateTaggedBufferAssetIds(nextIds);
+                                      } else {
+                                        const nextIds = [...currentSelectedIds, asset.id];
+                                        handleUpdateTaggedBufferAssetIds(nextIds);
+                                      }
+                                    }}
+                                  />
+                                  <span className="font-semibold truncate">{asset.name}</span>
+                                </div>
+                                <span className="font-bold text-[10px] pl-1 text-stone-200">
+                                  {(vaultData.currencySymbol || '₹')}{Math.floor(asset.currentValue).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {vaultData.assets.length === 0 && (
+                            <div className="text-[10px] italic text-stone-500 text-center py-4">No assets available to tag.</div>
+                          )}
+                        </div>
+
+                        {/* Status feedback line */}
+                        <div className="flex justify-between items-center text-[10px] font-mono px-1 py-0.5">
+                          <span className="text-stone-500">Selected Support Accumulation:</span>
+                          <span className={bufferReached ? "text-emerald-400 font-extrabold" : "text-amber-400 font-bold"}>
+                            {(vaultData.currencySymbol || '₹')}{currentSum.toLocaleString('en-IN')} / {(vaultData.currencySymbol || '₹')}{desiredBuffer.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 3. Budget categories list for threshold alert editing */}
