@@ -1364,7 +1364,7 @@ export default function App() {
       if (rule.id.startsWith('system-insight-')) {
         triggered.push({
           rule,
-          message: `🦾 [Sovereign AI] Your recent action "${rule.name.replace('Sovereign Insight: ', '')}" altered your tax slab exposure or compounding velocity. Compilation of your fresh compliance dossier is ready in AI Insights!`,
+          message: `🦾 AI: Action modified tax slab or velocity. Review fresh details on AI Insights.`,
           severity: 'info'
         });
         return;
@@ -1383,7 +1383,7 @@ export default function App() {
         if (combinedValue < thresholdAmt) {
           triggered.push({
             rule,
-            message: `📉 [${namesJoined}] Combined value (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) fell below minimum alert threshold (${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()})`,
+            message: `📉 [${namesJoined}] (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) fell below threshold ₹${thresholdAmt.toLocaleString()}`,
             severity: 'warning'
           });
         }
@@ -1391,7 +1391,7 @@ export default function App() {
         if (combinedValue > thresholdAmt) {
           triggered.push({
             rule,
-            message: `📈 [${namesJoined}] Combined value (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) exceeded target alert threshold (${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()})`,
+            message: `📈 [${namesJoined}] (${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}) exceeded target ₹${thresholdAmt.toLocaleString()}`,
             severity: 'info'
           });
         }
@@ -1400,7 +1400,7 @@ export default function App() {
         if (pctOfNetWorth < thresholdPct) {
           triggered.push({
             rule,
-            message: `⚖️ [${namesJoined}] Allocation weight (${pctOfNetWorth.toFixed(1)}% of Net Worth) fell below alert threshold (${thresholdPct}%)`,
+            message: `⚖️ [${namesJoined}] (${pctOfNetWorth.toFixed(1)}% of Net Worth) fell below alert weight ${thresholdPct}%`,
             severity: 'warning'
           });
         }
@@ -1409,7 +1409,7 @@ export default function App() {
         if (pctOfNetWorth > thresholdPct) {
           triggered.push({
             rule,
-            message: `🚨 [${namesJoined}] Allocation weight (${pctOfNetWorth.toFixed(1)}% of Net Worth) exceeded warning concentration ceiling (${thresholdPct}%)`,
+            message: `🚨 [${namesJoined}] (${pctOfNetWorth.toFixed(1)}% of Net Worth) exceeded warning ceiling ${thresholdPct}%`,
             severity: 'warning'
           });
         }
@@ -1439,7 +1439,7 @@ export default function App() {
                 targetAmount: asset.bondInterestAmount,
                 isActive: true
               },
-              message: `📅 Bond Interest Due! [${asset.name}] (${asset.bondRiskFactor || 'Unrated'} Risk) has an interest payment of ${vaultData.currencySymbol || '₹'}${asset.bondInterestAmount.toLocaleString()} set on day ${payoutDay} of this month. Please confirm receipt.`,
+              message: `📅 Bond Interest Due: [${asset.name}] (${vaultData.currencySymbol || '₹'}${asset.bondInterestAmount.toLocaleString()}). Please confirm receipt.`,
               severity: 'info'
             });
           }
@@ -1469,7 +1469,7 @@ export default function App() {
             isActive: true,
             assetIds: []
           },
-          message: `⚠️ Daily Cap Overrun! Today's logged expenses of ${vaultData.currencySymbol || '₹'}${todayExpensesSum.toLocaleString()} have exceeded your calculated daily budget limit of ${vaultData.currencySymbol || '₹'}${dailyLimit.toLocaleString('en-IN', { maximumFractionDigits: 1 })}. Pluck or trim excess leisure outlays!`,
+          message: `⚠️ Daily Overrun: Spends (${vaultData.currencySymbol || '₹'}${todayExpensesSum.toLocaleString()}) exceeded limit of ₹${dailyLimit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}.`,
           severity: 'warning'
         });
       }
@@ -1685,6 +1685,7 @@ export default function App() {
                 taggedBufferAssetIds={vaultData.taggedBufferAssetIds || []}
                 onUpdateTaggedBufferAssets={handleUpdateTaggedBufferAssetIds}
                 onChangeTab={setActiveTab}
+                usdConversionRate={vaultData.usdConversionRate !== undefined ? vaultData.usdConversionRate : 83.5}
               />
 
               <GoalMilestones
@@ -1774,6 +1775,7 @@ export default function App() {
               goals={vaultData.goals}
               compiledInsightsText={vaultData.compiledInsightsText}
               onUpdateCompiledInsightsText={handleUpdateCompiledInsightsText}
+              budgetCategoryLimits={vaultData.budgetCategoryLimits || []}
             />
           )}
 

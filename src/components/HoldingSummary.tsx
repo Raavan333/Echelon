@@ -47,6 +47,7 @@ interface HoldingSummaryProps {
   taggedBufferAssetIds?: string[];
   onUpdateTaggedBufferAssets?: (ids: string[]) => void;
   onChangeTab?: (tab: 'portfolio' | 'assets' | 'loans' | 'budget' | 'ai') => void;
+  usdConversionRate?: number;
 }
 
 type PeriodType = 'hour' | 'day' | 'month' | 'year' | '5year';
@@ -70,6 +71,7 @@ export default function HoldingSummary({
   taggedBufferAssetIds = [],
   onUpdateTaggedBufferAssets,
   onChangeTab,
+  usdConversionRate = 83.5,
 }: HoldingSummaryProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const [forecastYears, setForecastYears] = useState<number>(3);
@@ -82,7 +84,7 @@ export default function HoldingSummary({
   const tokens = getColorTokens(theme);
 
   // Totals calculations
-  const totalAssetsVal = assets.reduce((sum, a) => sum + a.currentValue, 0);
+  const totalAssetsVal = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
   const totalLentVal = loans
     .filter(l => l.type === LoanType.LENT)
     .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
@@ -174,24 +176,33 @@ export default function HoldingSummary({
 
   // Distribution chart parameters
   const categories = [
-    { label: 'Equities', amount: assets.filter(a => a.type === 'EQUITY').reduce((sum, a) => sum + a.currentValue, 0), color: '#3b82f6' },
-    { label: 'FDs', amount: assets.filter(a => a.type === 'FD').reduce((sum, a) => sum + a.currentValue, 0), color: '#10b981' },
-    { label: 'Bonds', amount: assets.filter(a => a.type === 'BOND').reduce((sum, a) => sum + a.currentValue, 0), color: '#8b5cf6' },
-    { label: 'Delivery Stocks', amount: assets.filter(a => a.type === 'STOCK').reduce((sum, a) => sum + a.currentValue, 0), color: '#f59e0b' },
-    { label: 'Bank Balances', amount: assets.filter(a => a.type === 'BANK_BALANCE').reduce((sum, a) => sum + a.currentValue, 0), color: '#06b6d4' },
+    { label: 'Equities', amount: assets.filter(a => a.type === 'EQUITY').reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0), color: '#3b82f6' },
+    { label: 'FDs', amount: assets.filter(a => a.type === 'FD').reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0), color: '#10b981' },
+    { label: 'Bonds', amount: assets.filter(a => a.type === 'BOND').reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0), color: '#8b5cf6' },
+    { label: 'Delivery Stocks', amount: assets.filter(a => a.type === 'STOCK').reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0), color: '#f59e0b' },
+    { label: 'Bank Balances', amount: assets.filter(a => a.type === 'BANK_BALANCE').reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0), color: '#06b6d4' },
     { label: 'Lent (Contracts)', amount: totalLentVal, color: '#ec4899' },
   ].filter(c => c.amount > 0);
 
   const totalPie = categories.reduce((sum, c) => sum + c.amount, 0);
 
+  // Dynamic Portfolio Blended Yield
   let totalYieldAmount = 0;
   assets.forEach(a => {
     const r = a.annualGrowthRate !== undefined 
       ? a.annualGrowthRate 
       : (a.type === 'FD' ? 7.1 : a.type === 'BOND' ? 8.5 : (a.type === 'EQUITY' || a.type === 'STOCK') ? 12 : 3.5);
-    totalYieldAmount += a.currentValue * (r / 100);
+    const val = a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue;
+    totalYieldAmount += val * (r / 100);
   });
-  totalYieldAmount += totalLentVal * 0.12; 
+
+  // Add lent out investments yielding their custom interestRate
+  loans.forEach(loan => {
+    if (loan.type === LoanType.LENT) {
+      const balance = calculateLoanCurrentBalance(loan);
+      totalYieldAmount += balance * (loan.interestRate / 100);
+    }
+  });
 
   let totalBorrowedInterestCosts = 0;
   loans.forEach(loan => {
@@ -201,7 +212,13 @@ export default function HoldingSummary({
     }
   });
 
-  const blendedAPY = totalPie > 0 ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalPie) * 100 : 0;
+  // Denominator: Total investment capital base (converted assets + lent out contracts balance)
+  const totalAssetsValConverted = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
+  const totalInvestmentBase = totalAssetsValConverted + totalLentVal;
+
+  const blendedAPY = totalInvestmentBase > 0 
+    ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalInvestmentBase) * 100 
+    : 0;
 
   // Forecast accumulation calculation with compound interest estimate
   const forecastPortfolioValues = Array.from({ length: 6 }).map((_, i) => {

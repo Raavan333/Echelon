@@ -11,7 +11,7 @@ import {
   Coins,
   Calculator
 } from 'lucide-react';
-import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal } from '../types';
+import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal, BudgetCategoryLimit } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
 
@@ -26,6 +26,7 @@ interface AIInsightsProps {
   goals?: FinancialGoal[];
   compiledInsightsText?: string;
   onUpdateCompiledInsightsText?: (text: string) => void;
+  budgetCategoryLimits?: BudgetCategoryLimit[];
 }
 
 export default function AIInsights({
@@ -39,6 +40,7 @@ export default function AIInsights({
   goals = [],
   compiledInsightsText = '',
   onUpdateCompiledInsightsText,
+  budgetCategoryLimits = [],
 }: AIInsightsProps) {
   const [score, setScore] = useState<number>(65);
   
@@ -60,10 +62,10 @@ export default function AIInsights({
 
   const totalLentVal = loans
     .filter(l => l.type === LoanType.LENT)
-    .reduce((sum, l) => sum + (l.principal - l.manualPayments), 0);
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
   const totalBorrowedVal = loans
     .filter(l => l.type === LoanType.BORROWED)
-    .reduce((sum, l) => sum + (l.principal - l.manualPayments), 0);
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
 
   // Dynamic Portfolio Blended Yield
   let totalYieldAmount = 0;
@@ -71,9 +73,16 @@ export default function AIInsights({
     const r = a.annualGrowthRate !== undefined 
       ? a.annualGrowthRate 
       : (a.type === 'FD' ? 7.1 : a.type === 'BOND' ? 8.5 : (a.type === 'EQUITY' || a.type === 'STOCK') ? 12 : 3.5);
-    
     const val = a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue;
     totalYieldAmount += val * (r / 100);
+  });
+
+  // Add lent out investments yielding their custom interestRate
+  loans.forEach(loan => {
+    if (loan.type === LoanType.LENT) {
+      const balance = calculateLoanCurrentBalance(loan);
+      totalYieldAmount += balance * (loan.interestRate / 100);
+    }
   });
 
   let totalBorrowedInterestCosts = 0;
@@ -84,7 +93,13 @@ export default function AIInsights({
     }
   });
 
-  const blendedAPY = totalAssetsVal > 0 ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalAssetsVal) * 100 : 0;
+  // Denominator: Total investment capital base (converted assets + lent out contracts balance)
+  const totalAssetsValConverted = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
+  const totalInvestmentBase = totalAssetsValConverted + totalLentVal;
+
+  const blendedAPY = totalInvestmentBase > 0 
+    ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalInvestmentBase) * 100 
+    : 0;
 
   // Identify high interest rate debts
   const highInterestDebts = loans.filter(l => l.type === LoanType.BORROWED && l.interestRate > blendedAPY);
@@ -288,12 +303,11 @@ export default function AIInsights({
     const list: string[] = [];
 
     // 1. Income & Tax Bracket
-    if (grossTotalIncome <= 1200000) {
-      list.push(`Your income is less than 12 lakhs so owe 0% tax and has 1.25 lakhs tax rebate on long term capital gains (exempt from heavy statutory slabs).`);
+    if (grossTotalIncome > 1200000) {
+      const savedAmt = Math.round(50000 * estSlabFactor);
+      list.push(`Do claim ₹50,000 NPS (Section 80CCD) deduction to bag ₹${savedAmt.toLocaleString('en-IN')} extra tax savings. Why: Slab deduction`);
     } else {
-      const estIncomeTax = calculateTax(netTaxableIncome);
-      const formattedTotal = `${currencySymbol}${estIncomeTax.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-      list.push(`Your estimated net taxable income is ${currencySymbol}${netTaxableIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })} resulting in estimated ${formattedTotal} liabilities under the New Regime. Action: claim ₹50,000 extra deductions under Section 80CCD(2) with NPS to save ${currencySymbol}${(15000 * estSlabFactor).toLocaleString()} instantly.`);
+      list.push(`Do keep total taxable income below ₹12L to avoid heavy taxation loss. Why: Rebate`);
     }
 
     // 2. Domestic Stocks (held <= 1 year is STCG; > 1 year is LTCG)
@@ -303,12 +317,12 @@ export default function AIInsights({
 
     if (stcgDom.length > 0) {
       const names = stcgDom.map(a => a.name).join(', ');
-      list.push(`⚠️ Don't sell ${names} right now as they are categorised under Short term capital gains (subject to flat 20% taxes before hitting 12 months).`);
+      list.push(`Don't sell short-term domestic stocks (${names}) to avoid 20% active taxation loss. Why: STCG`);
     }
 
     if (ltcgDom.length > 0) {
       const names = ltcgDom.map(a => a.name).join(', ');
-      list.push(`✅ You can sell ${names} stocks as they are categorised under Long term capital gains (enabling the standard stable ₹1.25 Lakhs tax-free exemption limit).`);
+      list.push(`Do sell long-term domestic stocks (${names}) to bag ₹1.25 Lakhs tax-free exemption profit. Why: LTCG`);
     }
 
     // 3. US Stocks (held <= 2 years is US STCG; > 2 years is US LTCG)
@@ -317,43 +331,88 @@ export default function AIInsights({
     const ltcgUS = usStocks.filter(a => a.isLongTerm);
 
     if (stcgUS.length > 0) {
-      const names = stcgUS.map(a => `${a.name} ($${a.currentValue.toLocaleString()})`).join(', ');
-      list.push(`⚠️ Don't sell US stocks: ${names} right now as they are categorised under Short term capital gains (held ≤ 24 months, siphoned straight into your high active tax slabs).`);
+      const names = stcgUS.map(a => a.name).join(', ');
+      list.push(`Don't sell short-term US stocks (${names}) to avoid active tax slab rate loss. Why: STCG`);
     }
 
     if (ltcgUS.length > 0) {
-      const names = ltcgUS.map(a => `${a.name} ($${a.currentValue.toLocaleString()})`).join(', ');
-      list.push(`✅ You can sell US stocks: ${names} tax-optimally as they are classified under US Long term capital gains (held > 24 months, qualifying for a safe 12.5% taxation rate).`);
+      const names = ltcgUS.map(a => a.name).join(', ');
+      list.push(`Do sell long-term US stocks (${names}) to bag 12.5% taxation rate profit. Why: LTCG`);
     }
 
     // 4. Corporate Bonds & Credit Quality Ratings
     const bondsList = assets.filter(a => a.type === 'BOND');
     bondsList.forEach(b => {
-      const rating = b.bondRiskFactor || 'AAA';
-      const period = b.bondInterestPeriod || 'monthly';
       const yieldPct = b.annualGrowthRate !== undefined ? b.annualGrowthRate : 8.5;
-      list.push(`📜 Your ${b.name} bond holds a premium credit rating of [${rating}], scheduled to compound stable ${yieldPct}% interest coupon payouts ${period}.`);
+      list.push(`Do hold ${b.name} corporate bonds to bag stable ${yieldPct}% coupon interest profit. Why: Bond payout`);
     });
 
     // 5. Debt Drag / Leaks Checks
     highInterestDebts.forEach(l => {
-      const currentDebtVal = l.principal - l.manualPayments;
-      list.push(`🛑 Pay off ${l.name} debt of ${currencySymbol}${currentDebtVal.toLocaleString()} immediately as its interest rate of ${l.interestRate}% exceeds your blended asset yield rate (${blendedAPY.toFixed(1)}%).`);
+      const currentDebtVal = calculateLoanCurrentBalance(l);
+      list.push(`Do pay off ${l.name} debt of ${currencySymbol}${currentDebtVal.toLocaleString()} immediately to avoid high interest rate loss. Why: Overspent`);
     });
 
     // 6. Emergency Buffer Cushion
     if (emergencyShieldMonths < 6) {
       const deficiency = Math.max(0, Math.ceil(recentSpends_30d * 6 - liquidCash));
-      list.push(`⚠️ Accumulate an emergency buffer of ${currencySymbol}${deficiency.toLocaleString()} in secure savings to establish a solid-state 6 months expenditures shelter.`);
+      list.push(`Do accumulate ${currencySymbol}${deficiency.toLocaleString()} in liquid cash to avoid immediate reserve depletion loss. Why: Low buffer`);
     } else {
-      list.push(`🛡️ Emergency reserve is solid at ${emergencyShieldMonths.toFixed(1)} months of cash expenditures (${currencySymbol}${liquidCash.toLocaleString()}), preserving compound momentum.`);
+      list.push(`Do hold stable cash reserves at ${emergencyShieldMonths.toFixed(1)} months to bag compound safety preservation profit. Why: Shield ok`);
     }
 
-    // 7. General Cash flow status
+    // 7. Budget / Spends checking
+    const categoryTotals: Record<string, number> = {};
+    expenses.forEach(e => {
+      const catName = e.category.toLowerCase().trim();
+      categoryTotals[catName] = (categoryTotals[catName] || 0) + e.amount;
+    });
+
+    let budgetSpendsFound = false;
+    if (budgetCategoryLimits && budgetCategoryLimits.length > 0) {
+      budgetCategoryLimits.forEach(cl => {
+        const catName = cl.category.toLowerCase().trim();
+        const spent = categoryTotals[catName] || 0;
+        if (spent > cl.limit) {
+          budgetSpendsFound = true;
+          if (catName === 'snacks' || catName.includes('snack')) {
+            list.push(`Don't spend more on category Snacks to avoid overspent loss. Why: Try to consume less on the category snacks`);
+          } else {
+            list.push(`Don't spend more on category ${cl.category} to avoid overspent loss. Why: Overspent`);
+          }
+        } else if (spent > cl.limit * 0.8) {
+          budgetSpendsFound = true;
+          if (catName === 'snacks' || catName.includes('snack')) {
+            list.push(`Don't spend more on category Snacks to avoid imminent overspent loss. Why: Try to consume less on the category snacks`);
+          } else {
+            list.push(`Don't spend more on category ${cl.category} to avoid imminent overspent loss. Why: Overspent`);
+          }
+        }
+      });
+    }
+
+    const snacksEntry = Object.entries(categoryTotals).find(([cat]) => cat === 'snacks' || cat.includes('snack'));
+    const hasSnacksSpends = snacksEntry && snacksEntry[1] > 0;
+
+    if (!budgetSpendsFound || hasSnacksSpends) {
+      list.push(`Don't spend more on category Snacks to avoid discretionary leak loss. Why: Try to consume less on the category snacks`);
+
+      const sortedHighest = Object.entries(categoryTotals)
+        .filter(([cat]) => cat !== 'snacks' && !cat.includes('snack'))
+        .sort((a, b) => b[1] - a[1]);
+
+      if (sortedHighest.length > 0) {
+        const [highestCat] = sortedHighest[0];
+        const formattedCatName = highestCat.charAt(0).toUpperCase() + highestCat.slice(1);
+        list.push(`Don't spend more on category ${formattedCatName} to avoid budget overrun loss. Why: Overspent`);
+      }
+    }
+
+    // 8. General Cash flow status
     if (rates.netPerMonth <= 0) {
-      list.push(`🚨 System cash alert: Operating cash flow runs at a monthly deficit of -${currencySymbol}${Math.abs(rates.netPerMonth).toLocaleString()}. Trim discretionary outlays.`);
+      list.push(`Don't maintain monthly discretionary cash outlays to avoid -${currencySymbol}${Math.abs(rates.netPerMonth).toLocaleString()} monthly deficit loss. Why: Overspent`);
     } else {
-      list.push(`🚀 Compounding velocity active: quiet capital surplus of +${currencySymbol}${rates.netPerMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}/mo accumulates safely.`);
+      list.push(`Do invest your +${currencySymbol}${rates.netPerMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}/mo net surplus to bag extra compounding passive gains. Why: LTCG`);
     }
 
     return list;
