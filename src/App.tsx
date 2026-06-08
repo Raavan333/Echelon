@@ -443,9 +443,8 @@ export default function App() {
     setLastActionMessage(actionMsg);
     
     const nextState = updater(vaultData);
-    saveVaultData(nextState);
 
-    // Trigger AI tax insight alert for portfolio & outflow mutations
+    // Trigger AI tax insight alert rule for portfolio & outflow mutations - sent directly to notification tab
     const msg = actionMsg.toLowerCase();
     if (
       msg.includes('asset') ||
@@ -455,11 +454,21 @@ export default function App() {
       msg.includes('outflow') ||
       msg.includes('transfer')
     ) {
-      setNewInsightAlert({
-        message: `Your recent portfolio transaction/budget adjustments ("${actionMsg}") altered your tax slab exposure or compounding velocity. Click here to trigger a Sovereign AI compilation of your updated compliance dossier!`,
-        actionMsg: actionMsg
-      });
+      if (!nextState.structuredAlertRules) {
+        nextState.structuredAlertRules = [];
+      }
+      const newRule: AlertRule = {
+        id: `system-insight-${Date.now()}`,
+        name: `Sovereign Insight: ${actionMsg}`,
+        assetIds: [],
+        conditionType: 'above_amount',
+        targetAmount: 0,
+        isActive: true
+      };
+      nextState.structuredAlertRules.push(newRule);
     }
+
+    saveVaultData(nextState);
   };
 
   const handleUndo = () => {
@@ -1321,6 +1330,15 @@ export default function App() {
     
     vaultData.structuredAlertRules.forEach(rule => {
       if (!rule.isActive) return;
+
+      if (rule.id.startsWith('system-insight-')) {
+        triggered.push({
+          rule,
+          message: `🦾 [Sovereign AI] Your recent action "${rule.name.replace('Sovereign Insight: ', '')}" altered your tax slab exposure or compounding velocity. Compilation of your fresh compliance dossier is ready in AI Insights!`,
+          severity: 'info'
+        });
+        return;
+      }
       
       const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
       if (selectedAssets.length === 0 && rule.assetIds && rule.assetIds.length > 0) return;
@@ -1597,42 +1615,6 @@ export default function App() {
 
       {/* MAIN WORKSPACE SECTION */}
       <main className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
-        
-        {newInsightAlert && (
-          <div 
-            onClick={() => {
-              setActiveTab('ai');
-              setNewInsightAlert(null);
-            }}
-            className="animate-pulse cursor-pointer group"
-          >
-            <div className="p-4 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-4 transition-all duration-305 shadow-xl shadow-amber-500/5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-500/20 text-amber-500 rounded-xl border border-amber-500/30">
-                  <Brain className="h-5 w-5 text-amber-500 animate-bounce" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono leading-none tracking-widest text-amber-500 uppercase block font-black mb-1">
-                    ⚡ NEW SOVEREIGN WEALTH INSIGHT CHANNELD
-                  </span>
-                  <p className="text-xs text-stone-200 font-mono leading-relaxed group-hover:text-amber-400 transition-colors">
-                    {newInsightAlert.message}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setNewInsightAlert(null);
-                }}
-                className="p-1 px-2.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-850/50 text-[10px] uppercase font-mono font-bold transition-all border border-stone-800"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
         
         {/* 2. DYNAMIC WORKSPACE PAGES */}
         <div className="animate-fade-in pb-36">

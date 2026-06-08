@@ -192,7 +192,16 @@ export default function HoldingSummary({
     totalYieldAmount += a.currentValue * (r / 100);
   });
   totalYieldAmount += totalLentVal * 0.12; 
-  const blendedAPY = totalPie > 0 ? (totalYieldAmount / totalPie) * 100 : 0;
+
+  let totalBorrowedInterestCosts = 0;
+  loans.forEach(loan => {
+    if (loan.type === LoanType.BORROWED) {
+      const balance = calculateLoanCurrentBalance(loan);
+      totalBorrowedInterestCosts += balance * (loan.interestRate / 100);
+    }
+  });
+
+  const blendedAPY = totalPie > 0 ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalPie) * 100 : 0;
 
   // Forecast accumulation calculation with compound interest estimate
   const forecastPortfolioValues = Array.from({ length: 6 }).map((_, i) => {

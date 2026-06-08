@@ -190,10 +190,11 @@ export function calculateWealthRates(
   const netPerYear = earningsPerYear - lossesPerYear;
   const netPerFiveYears = earningsPerFiveYears - lossesPerFiveYears;
 
-  // Rate of earning as % of active base
-  const earningsRatePercentOfYear = totalPortfolioValue > 0 
-    ? (netPerYear / totalPortfolioValue) * 100 
-    : 0;
+  // Rate of earning as % of active base or active pool
+  const denom = totalPortfolioValue !== 0 
+    ? Math.abs(totalPortfolioValue) 
+    : (totalAnnualPassiveEarnings > 0 ? totalAnnualPassiveEarnings : 1);
+  const earningsRatePercentOfYear = (netPerYear / denom) * 100;
 
   return {
     earningsPerHour,

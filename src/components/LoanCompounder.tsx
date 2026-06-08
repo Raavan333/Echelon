@@ -364,114 +364,203 @@ export default function LoanCompounder({
               <p className="text-xs text-stone-500 font-mono">No credit agreements inside active ledgers.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {loans.map((loan) => {
-                const currentBal = calculateLoanCurrentBalance(loan);
-                const totalAccInterest = calculateLoanAccruedInterest(loan);
-                const isLent = loan.type === LoanType.LENT;
+            <div className="space-y-8 animate-fade-in">
+              {/* ACTIVE LOANS */}
+              {loans.filter(l => calculateLoanCurrentBalance(l) > 0).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#9ca3af]">
+                    Active Debt Contracts & Obligations ({loans.filter(l => calculateLoanCurrentBalance(l) > 0).length})
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {loans.filter(l => calculateLoanCurrentBalance(l) > 0).map((loan) => {
+                      const currentBal = calculateLoanCurrentBalance(loan);
+                      const totalAccInterest = calculateLoanAccruedInterest(loan);
+                      const isLent = loan.type === LoanType.LENT;
 
-                return (
-                  <div
-                    key={loan.id}
-                    className={`p-5 rounded-2xl border ${tokens.card} relative overflow-hidden flex flex-col justify-between hover:scale-[1.01] transition-all`}
-                  >
-                    <div className="absolute top-0 right-0 h-1 w-full bg-gradient-to-r" style={{ backgroundImage: isLent ? 'linear-gradient(to right, #10b981, #059669)' : 'linear-gradient(to right, #ef4444, #dc2626)' }} />
-
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className={`text-[9px] font-mono font-bold uppercase rounded-lg px-2.5 py-0.5 flex items-center gap-1 ${isLent ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                          {isLent ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                          {isLent ? 'LENT (RECEIVABLE)' : 'BORROWED (LIABILITY)'}
-                        </span>
-                        <button
-                          type="button"
-                          id={`delete-loan-btn-${loan.id}`}
-                          onClick={() => onRemoveLoan(loan.id)}
-                          className="h-6 w-6 rounded hover:bg-red-500/20 flex items-center justify-center text-stone-400 hover:text-red-500 transition-colors"
-                          title="Forfeit Agreement"
+                      return (
+                        <div
+                          key={loan.id}
+                          className={`p-5 rounded-2xl border ${tokens.card} relative overflow-hidden flex flex-col justify-between hover:scale-[1.01] transition-all`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                          <div className="absolute top-0 right-0 h-1 w-full bg-gradient-to-r" style={{ backgroundImage: isLent ? 'linear-gradient(to right, #10b981, #059669)' : 'linear-gradient(to right, #ef4444, #dc2626)' }} />
 
-                      <h3 className={`text-base font-bold ${tokens.textPrimary}`}>{loan.name}</h3>
-                      <p className="text-xs text-stone-500 flex items-center gap-1.5 mt-0.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>With {loan.personOrEntity} &bull; Started {new Date(loan.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
-                      </p>
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className={`text-[9px] font-mono font-bold uppercase rounded-lg px-2.5 py-0.5 flex items-center gap-1 ${isLent ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                {isLent ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                {isLent ? 'LENT (RECEIVABLE)' : 'BORROWED (LIABILITY)'}
+                              </span>
+                              <button
+                                type="button"
+                                id={`delete-loan-btn-${loan.id}`}
+                                onClick={() => onRemoveLoan(loan.id)}
+                                className="h-6 w-6 rounded hover:bg-red-500/20 flex items-center justify-center text-stone-400 hover:text-red-500 transition-colors"
+                                title="Forfeit Agreement"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
 
-                      <div className="bg-stone-500/5 hover:bg-stone-500/10 p-3 rounded-xl mt-4 grid grid-cols-2 gap-2 border border-stone-500/10">
-                        <div>
-                          <span className="text-[10px] uppercase text-stone-500 font-mono block">Orig. Principal</span>
-                          <span className={`text-sm font-semibold font-mono ${tokens.textPrimary}`}>{currencySymbol}{loan.principal.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Rate</span>
-                          <span className={`text-sm font-semibold font-mono text-amber-500`}>{loan.interestRate}% APY</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Int.</span>
-                          <span className="text-sm font-semibold font-mono text-amber-600">{currencySymbol}{totalAccInterest.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase text-stone-500 font-mono block">Total Repaid</span>
-                          <span className="text-sm font-semibold font-mono text-stone-400">{currencySymbol}{loan.manualPayments.toLocaleString('en-IN')}</span>
-                        </div>
-                      </div>
+                            <h3 className={`text-base font-bold ${tokens.textPrimary}`}>{loan.name}</h3>
+                            <p className="text-xs text-stone-500 flex items-center gap-1.5 mt-0.5">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>With {loan.personOrEntity} &bull; Started {new Date(loan.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                            </p>
 
-                      <div className="mt-4 flex justify-between items-baseline">
-                        <span className="text-xs uppercase font-bold text-stone-500 font-mono">Current Balance</span>
-                        <span className={`text-xl font-mono font-black ${isLent ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {currencySymbol}{currentBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
+                            <div className="bg-stone-500/5 hover:bg-stone-500/10 p-3 rounded-xl mt-4 grid grid-cols-2 gap-2 border border-stone-500/10">
+                              <div>
+                                <span className="text-[10px] uppercase text-stone-500 font-mono block">Orig. Principal</span>
+                                <span className={`text-sm font-semibold font-mono ${tokens.textPrimary}`}>{currencySymbol}{loan.principal.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Rate</span>
+                                <span className={`text-sm font-semibold font-mono text-amber-500`}>{loan.interestRate}% APY</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] uppercase text-stone-500 font-mono block">Compound Int.</span>
+                                <span className="text-sm font-semibold font-mono text-amber-600">{currencySymbol}{totalAccInterest.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] uppercase text-stone-500 font-mono block">Total Repaid</span>
+                                <span className="text-sm font-semibold font-mono text-stone-400">{currencySymbol}{loan.manualPayments.toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
 
-                    <div className="mt-4 pt-3 border-t border-dashed border-stone-800/15 dark:border-stone-100/10 flex items-center justify-between gap-2">
-                      {repayId === loan.id ? (
-                        <div className="flex items-center gap-1.5 w-full animate-fade-in">
-                          <input
-                            type="number"
-                            id={`repay-input-${loan.id}`}
-                            placeholder={`Repayment amount ${currencySymbol}`}
-                            value={repayVal}
-                            onChange={(e) => setRepayVal(e.target.value)}
-                            className={`flex-1 px-2 py-1 bg-stone-900 border ${tokens.border} text-xs font-mono rounded-lg text-stone-200 focus:outline-none focus:border-amber-500`}
-                          />
-                          <button
-                            type="button"
-                            id={`apply-repayment-btn-${loan.id}`}
-                            onClick={() => handleApplyRepayment(loan.id)}
-                            className="text-[10px] font-bold px-3 py-1.5 bg-emerald-600 text-white rounded-lg"
-                          >
-                            Enforce
-                          </button>
-                          <button
-                            type="button"
-                            id={`cancel-repayment-btn-${loan.id}`}
-                            onClick={() => setRepayId(null)}
-                            className="text-[10px] text-stone-400 font-semibold px-2"
-                          >
-                            Back
-                          </button>
+                            <div className="mt-4 flex justify-between items-baseline">
+                              <span className="text-xs uppercase font-bold text-stone-500 font-mono">Current Balance</span>
+                              <span className={`text-xl font-mono font-black ${isLent ? 'text-emerald-500' : 'text-red-500'}`}>
+                                {currencySymbol}{currentBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-dashed border-stone-800/15 dark:border-stone-100/10 flex items-center justify-between gap-2">
+                            {repayId === loan.id ? (
+                              <div className="flex items-center gap-1.5 w-full animate-fade-in">
+                                <input
+                                  type="number"
+                                  id={`repay-input-${loan.id}`}
+                                  placeholder={`Repayment amount ${currencySymbol}`}
+                                  value={repayVal}
+                                  onChange={(e) => setRepayVal(e.target.value)}
+                                  className={`flex-1 px-2 py-1 bg-stone-900 border ${tokens.border} text-xs font-mono rounded-lg text-stone-200 focus:outline-none focus:border-amber-500`}
+                                />
+                                <button
+                                  type="button"
+                                  id={`apply-repayment-btn-${loan.id}`}
+                                  onClick={() => handleApplyRepayment(loan.id)}
+                                  className="text-[10px] font-bold px-3 py-1.5 bg-emerald-600 text-white rounded-lg"
+                                >
+                                  Enforce
+                                </button>
+                                <button
+                                  type="button"
+                                  id={`cancel-repayment-btn-${loan.id}`}
+                                  onClick={() => setRepayId(null)}
+                                  className="text-[10px] text-stone-400 font-semibold px-2"
+                                >
+                                  Back
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-stone-500 font-mono font-medium">Automatic {loan.compoundingFrequency.toLowerCase()} period checks active</span>
+                                <button
+                                  type="button"
+                                  id={`start-repayment-btn-${loan.id}`}
+                                  onClick={() => { setRepayId(loan.id); setRepayVal(''); }}
+                                  className="text-[10px] font-extrabold uppercase px-3 py-1.5 bg-stone-100/5 hover:bg-stone-100/10 text-stone-300 rounded-lg font-mono border border-stone-700/50"
+                                >
+                                  Repay / Offset
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <>
-                          <span className="text-[10px] text-stone-500 font-mono font-medium">Automatic {loan.compoundingFrequency.toLowerCase()} period checks active</span>
-                          <button
-                            type="button"
-                            id={`start-repayment-btn-${loan.id}`}
-                            onClick={() => { setRepayId(loan.id); setRepayVal(''); }}
-                            className="text-[10px] font-extrabold uppercase px-3 py-1.5 bg-stone-100/5 hover:bg-stone-100/10 text-stone-300 rounded-lg font-mono border border-stone-700/50"
-                          >
-                            Repay / Offset
-                          </button>
-                        </>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* COMPLETED / SETTLED LOANS */}
+              {loans.filter(l => calculateLoanCurrentBalance(l) <= 0).length > 0 && (
+                <div className="space-y-3 pt-4">
+                  <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    Isolated & Fully Settled Credit Contracts ({loans.filter(l => calculateLoanCurrentBalance(l) <= 0).length})
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    {loans.filter(l => calculateLoanCurrentBalance(l) <= 0).map((loan) => {
+                      const totalAccInterest = calculateLoanAccruedInterest(loan);
+                      const isLent = loan.type === LoanType.LENT;
+
+                      return (
+                        <div
+                          key={loan.id}
+                          className="p-5 rounded-2xl border border-emerald-950/45 bg-[#03150d]/40 relative overflow-hidden flex flex-col justify-between shadow-lg shadow-emerald-950/10"
+                        >
+                          <div className="absolute top-0 right-0 h-1 w-full bg-[#059669]" />
+
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[9px] font-mono font-bold uppercase rounded-lg px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                ✓ Fully Settled
+                              </span>
+                              <button
+                                type="button"
+                                id={`delete-loan-btn-${loan.id}`}
+                                onClick={() => onRemoveLoan(loan.id)}
+                                className="h-6 w-6 rounded hover:bg-emerald-500/10 flex items-center justify-center text-emerald-600 hover:text-red-500 transition-colors"
+                                title="Prune Settled Agreement"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            <h3 className="text-base font-bold text-stone-300 line-through decoration-stone-600">{loan.name}</h3>
+                            <p className="text-xs text-stone-500 flex items-center gap-1.5 mt-0.5">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>With {loan.personOrEntity} &bull; Settled {new Date(loan.lastUpdated).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                            </p>
+
+                            <div className="bg-emerald-950/10 p-3 rounded-xl mt-4 grid grid-cols-2 gap-2 border border-emerald-900/10 text-stone-400">
+                              <div>
+                                <span className="text-[9px] uppercase text-stone-500 font-mono block">Orig. Principal</span>
+                                <span className="text-xs font-semibold font-mono text-zinc-300">{currencySymbol}{loan.principal.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase text-stone-500 font-mono block">Compound Rate</span>
+                                <span className="text-xs font-semibold font-mono text-zinc-300">{loan.interestRate}% APY</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase text-stone-500 font-mono block">Total Interest Accrued</span>
+                                <span className="text-xs font-semibold font-mono text-emerald-500">{currencySymbol}{totalAccInterest.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase text-stone-500 font-mono block">Completely Paid</span>
+                                <span className="text-xs font-semibold font-mono text-emerald-400">{currencySymbol}{loan.manualPayments.toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-between items-baseline">
+                              <span className="text-xs uppercase font-bold text-stone-500 font-mono">Current Balance</span>
+                              <span className="text-sm font-mono font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                                [✓ ACC ledger balanced]
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-dashed border-emerald-900/15 flex items-center justify-between text-[10px] font-mono text-emerald-500">
+                            <span>Sober treasury safety achieved</span>
+                            <span className="text-[9px] uppercase tracking-wide font-black bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25">Audit Complete</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

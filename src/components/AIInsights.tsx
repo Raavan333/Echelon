@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal } from '../types';
 import { getColorTokens } from '../utils/theme';
-import { calculateWealthRates } from '../utils/math';
+import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
 
 interface AIInsightsProps {
   theme: EchelonTheme;
@@ -75,7 +75,16 @@ export default function AIInsights({
     const val = a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue;
     totalYieldAmount += val * (r / 100);
   });
-  const blendedAPY = totalAssetsVal > 0 ? (totalYieldAmount / totalAssetsVal) * 100 : 0;
+
+  let totalBorrowedInterestCosts = 0;
+  loans.forEach(loan => {
+    if (loan.type === LoanType.BORROWED) {
+      const balance = calculateLoanCurrentBalance(loan);
+      totalBorrowedInterestCosts += balance * (loan.interestRate / 100);
+    }
+  });
+
+  const blendedAPY = totalAssetsVal > 0 ? ((totalYieldAmount - totalBorrowedInterestCosts) / totalAssetsVal) * 100 : 0;
 
   // Identify high interest rate debts
   const highInterestDebts = loans.filter(l => l.type === LoanType.BORROWED && l.interestRate > blendedAPY);
@@ -524,18 +533,18 @@ export default function AIInsights({
             <div className="space-y-4 animate-fade-in font-sans">
               
               {/* Compile bar */}
-              <div className="flex items-center justify-between p-3.5 bg-[#030304]/80 border border-stone-800 rounded-2xl mb-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-[#030304]/80 border border-stone-800 rounded-2xl mb-4 shadow-[0_0_15px_rgba(245,158,11,0.03)]">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
                   <span className="text-[10px] font-mono text-zinc-400 font-bold uppercase tracking-wider">
                     Model Learning Coherence Active
                   </span>
                 </div>
                 <button 
                   onClick={triggerQuantumAICompile} 
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-mono text-[10px] uppercase font-black rounded-lg transition-all flex items-center gap-1 hover:scale-105 active:scale-95"
+                  className="w-full sm:w-auto px-4 py-2 sm:py-1.5 bg-amber-500 hover:bg-amber-450 text-stone-950 font-mono text-[10px] uppercase font-black tracking-wide rounded-xl transition-all flex items-center justify-center gap-1.5 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)] hover:scale-102 active:scale-95"
                 >
-                  <RefreshCw className="h-3 w-3" />
+                  <RefreshCw className="h-3 w-3 animate-spin-slow" />
                   Compile Sovereign Advice
                 </button>
               </div>
@@ -553,19 +562,19 @@ export default function AIInsights({
                     return (
                       <div 
                         key={idx} 
-                        className={`p-3 rounded-xl border flex items-start gap-3 transition-all hover:bg-stone-500/[0.02] ${
+                        className={`p-3 rounded-xl border flex items-start gap-3 transition-all ${
                           isAlert 
-                            ? 'bg-rose-500/[0.015] border-rose-950/20' 
-                            : 'bg-[#060608]/40 border-stone-850/60'
+                            ? 'bg-red-500/5 border-red-500/30 text-red-100 shadow-[0_0_12px_rgba(239,68,68,0.08)]' 
+                            : 'bg-[#060608]/45 border-stone-850/60 hover:bg-stone-500/[0.02]'
                         }`}
                       >
                         <div className={`mt-0.5 shrink-0 h-4 w-4 rounded-full flex items-center justify-center ${
-                          isAlert ? 'text-amber-500' : 'text-emerald-400'
+                          isAlert ? 'text-red-400 animate-pulse' : 'text-emerald-400'
                         }`}
                         >
-                          {isAlert ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                          {isAlert ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> : <CheckCircle className="h-3.5 w-3.5" />}
                         </div>
-                        <p className={`text-xs leading-relaxed ${isAlert ? 'text-stone-300' : 'text-stone-400'}`}>
+                        <p className={`text-xs leading-relaxed ${isAlert ? 'text-red-200/90' : 'text-stone-400'}`}>
                           {insight}
                         </p>
                       </div>
