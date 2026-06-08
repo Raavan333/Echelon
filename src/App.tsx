@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -234,6 +235,46 @@ export default function App() {
 
     document.title = "Echelon Vault | Quiet Wealth Ledger";
   }, [vaultData?.selectedGalleryIcon, publicIcon]);
+
+  // Intercept physical back-button on Android and standard browser back button
+  useEffect(() => {
+    // When the app initializes, we replace the first state with the initial tab.
+    window.history.replaceState({ activeTab: 'portfolio', showNotificationsModal: false, showSettings: false }, '');
+  }, []);
+
+  // Whenever relevant navigation variables change, we can push a new state
+  useEffect(() => {
+    if (!vaultData) return;
+    const currentState = window.history.state;
+    // Check if the state in history is already matching to avoid infinite recursion
+    if (currentState && 
+        currentState.activeTab === activeTab && 
+        currentState.showNotificationsModal === showNotificationsModal && 
+        currentState.showSettings === showSettings) {
+      return;
+    }
+    window.history.pushState({ activeTab, showNotificationsModal, showSettings }, '');
+  }, [activeTab, showNotificationsModal, showSettings, !!vaultData]);
+
+  // Listen to popstate event
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state) {
+        const { activeTab: stateTab, showNotificationsModal: stateNotifications, showSettings: stateSettings } = event.state;
+        setActiveTab(stateTab || 'portfolio');
+        setShowNotificationsModal(!!stateNotifications);
+        setShowSettings(!!stateSettings);
+      } else {
+        // Fallback to default
+        setActiveTab('portfolio');
+        setShowNotificationsModal(false);
+        setShowSettings(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Atomic dual-timer security lockout: customizable UI idle timeout & background tab safety threshold
   useEffect(() => {
@@ -483,9 +524,14 @@ export default function App() {
   };
 
   const handleUpdateCategoryLimits = (limits: BudgetCategoryLimit[]) => {
+    const totalAmount = limits.reduce((sum, cl) => sum + cl.limit, 0);
     mutateVaultData(`Modified Category Limits`, (current) => ({
       ...current,
       budgetCategoryLimits: limits,
+      budget: {
+        ...current.budget,
+        amount: totalAmount,
+      }
     }));
   };
 
@@ -985,27 +1031,11 @@ export default function App() {
   };
 
   const handleDismissAlert = (alertItem: { rule: AlertRule; message: string; severity: 'warning' | 'info' }) => {
-    if (!vaultData) return;
     const rule = alertItem.rule;
-    const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
-    const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
-    const linkedNames = selectedAssets.map(a => a.name).join(', ') || 'Global';
-
-    setSessionDismissedAlertIds(prev => [...prev, rule.id]);
-
-    const newAckRecord: AcknowledgedAlertRecord = {
-      id: `ack-${Date.now()}-${rule.id}`,
-      ruleName: rule.name,
-      message: alertItem.message,
-      date: new Date().toISOString(),
-      linkedFundName: linkedNames,
-      closingBalance: combinedValue,
-    };
-
-    mutateVaultData(`Dismissed Safeguard Alert: ${rule.name}`, (current) => ({
-      ...current,
-      acknowledgedAlerts: [newAckRecord, ...(current.acknowledgedAlerts || [])],
-    }));
+    setSessionDismissedAlertIds(prev => {
+      if (prev.includes(rule.id)) return prev;
+      return [...prev, rule.id];
+    });
   };
 
   const handleLiquidateAssetPrematurely = (assetId: string, targetBankAccountId: string) => {
@@ -1834,9 +1864,25 @@ export default function App() {
 
             {/* Active alerts panel */}
             <div className="space-y-4">
-              <h3 className="text-xs font-mono uppercase font-black tracking-widest text-amber-500">
-                ⚠️ Active Safeguard Violations ({unacknowledgedAlerts.length})
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-mono uppercase font-black tracking-widest text-amber-500">
+                  ⚠️ Active Safeguard Violations ({unacknowledgedAlerts.length})
+                </h3>
+                {unacknowledgedAlerts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSessionDismissedAlertIds(prev => [
+                        ...prev,
+                        ...unacknowledgedAlerts.map(a => a.rule.id)
+                      ]);
+                    }}
+                    className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/15 hover:bg-rose-500 hover:text-stone-950 border border-rose-500/20 text-rose-400 rounded-xl transition-all"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
               
               {unacknowledgedAlerts.length === 0 ? (
                 <div className="p-6 border border-dashed border-stone-800 rounded-2xl text-center space-y-2">
@@ -1844,51 +1890,82 @@ export default function App() {
                   <p className="text-[11px] text-stone-500">None of your custom rules, sink thresholds, or allocation weights are flagged.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {unacknowledgedAlerts.map((alertItem, idx) => {
-                    const rule = alertItem.rule;
-                    const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
-                    const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
+                <div className="space-y-3 overflow-hidden">
+                  <div className="text-[10px] font-mono text-stone-500 flex justify-between items-center bg-stone-950/20 p-2 rounded-xl border border-stone-850/30">
+                    <span>💡 Tip: Swipe card right or tap dismiss to clear.</span>
+                    <span className="text-amber-500/70 font-bold uppercase">Swipe right →</span>
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {unacknowledgedAlerts.map((alertItem, idx) => {
+                      const rule = alertItem.rule;
+                      const selectedAssets = vaultData.assets.filter(a => rule.assetIds && rule.assetIds.includes(a.id));
+                      const combinedValue = selectedAssets.reduce((sum, a) => sum + a.currentValue, 0);
 
-                    return (
-                      <div key={idx} className="p-4 bg-rose-950/25 border border-rose-500/25 rounded-2xl space-y-3 shadow-md flex flex-col justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
-                              Rule [{rule.name}] Flagged
-                            </span>
-                            <span className="text-[10px] font-mono text-rose-500 uppercase font-semibold">Severity: {alertItem.severity}</span>
-                          </div>
-                          <p className="text-xs text-stone-200 leading-relaxed font-sans">{alertItem.message}</p>
-                          <div className="text-[10px] text-stone-500 font-mono space-y-0.5">
-                            <div>• Linked Fund Assets: {selectedAssets.map(a => a.name).join(', ') || 'Global'}</div>
-                            <div>• Target Limit: {vaultData.currencySymbol || '₹'}{(rule.targetAmount || 0).toLocaleString()} </div>
-                            <div>• Closing Boundary Balance: <strong className="text-white">{vaultData.currencySymbol || '₹'}{combinedValue.toLocaleString()}</strong></div>
-                          </div>
-                        </div>
+                      return (
+                        <motion.div
+                          key={rule.id}
+                          drag="x"
+                          dragDirectionLock
+                          dragConstraints={{ left: 0, right: 350 }}
+                          dragElastic={{ left: 0, right: 0.5 }}
+                          onDragEnd={(event, info) => {
+                            if (info.offset.x > 140) {
+                              setSessionDismissedAlertIds(prev => {
+                                if (prev.includes(rule.id)) return prev;
+                                return [...prev, rule.id];
+                              });
+                            }
+                          }}
+                          exit={{ x: 350, opacity: 0 }}
+                          transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                          className="relative cursor-grab active:cursor-grabbing touch-pan-y origin-left"
+                        >
+                          <div className="p-4 bg-rose-950/20 border border-rose-500/20 rounded-2xl space-y-3 shadow-md flex flex-col justify-between select-none">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                                  Rule [{rule.name}] Flagged
+                                </span>
+                                <span className="text-[10px] font-mono text-rose-500 uppercase font-semibold">Severity: {alertItem.severity}</span>
+                              </div>
+                              <p className="text-xs text-stone-200 leading-relaxed font-sans">{alertItem.message}</p>
+                              <div className="text-[10px] text-stone-500 font-mono space-y-0.5">
+                                <div>• Linked Fund Assets: {selectedAssets.map(a => a.name).join(', ') || 'Global'}</div>
+                                <div>• Target Limit: {vaultData.currencySymbol || '₹'}{(rule.targetAmount || 0).toLocaleString()} </div>
+                                <div>• Closing Boundary Balance: <strong className="text-white">{vaultData.currencySymbol || '₹'}{combinedValue.toLocaleString()}</strong></div>
+                              </div>
+                            </div>
 
-                        <div className="flex justify-end gap-2 pt-1">
-                          {rule.id.startsWith("bond-interest-payout-") && (
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmBondPayment(rule.id, selectedAssets[0]?.id || '')}
-                              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-450 text-stone-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all"
-                            >
-                              🤝 Confirm Payment Receipt
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleDismissAlert(alertItem)}
-                            className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-stone-950 border border-rose-500/20 text-rose-400 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xl transition-all"
-                          >
-                            {rule.id.startsWith("bond-interest-payout-") ? 'Remind Me Later' : '✓ Dismiss & Archive Event'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                            <div className="flex justify-end gap-2 pt-1">
+                              {rule.id.startsWith("bond-interest-payout-") && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirmBondPayment(rule.id, selectedAssets[0]?.id || '');
+                                  }}
+                                  className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-450 text-stone-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all"
+                                >
+                                  🤝 Confirm Payment Receipt
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDismissAlert(alertItem);
+                                }}
+                                className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-stone-950 border border-rose-500/20 text-rose-400 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xl transition-all"
+                              >
+                                {rule.id.startsWith("bond-interest-payout-") ? 'Remind Me Later' : '✓ Dismiss'}
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
                 </div>
               )}
             </div>

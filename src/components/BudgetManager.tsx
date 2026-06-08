@@ -130,7 +130,8 @@ export default function BudgetManager({
 
   // Spend totals calculations
   const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const spendPercentage = budget.amount > 0 ? (totalSpend / budget.amount) * 100 : 0;
+  const computedBudgetAmount = activeCategories.reduce((sum, c) => sum + c.limit, 0);
+  const spendPercentage = computedBudgetAmount > 0 ? (totalSpend / computedBudgetAmount) * 100 : 0;
   
   // Custom alerts triggers
   const isApproachingLimit = spendPercentage >= budget.spendingLimitAlertPercent && spendPercentage < 100;
@@ -138,7 +139,7 @@ export default function BudgetManager({
 
   const handleSaveBudget = (e: React.FormEvent) => {
     e.preventDefault();
-    const amt = parseFloat(budgetLimit);
+    const amt = computedBudgetAmount;
     const pct = parseFloat(alertPercent);
     if (!isNaN(amt) && !isNaN(pct) && amt > 0) {
       onConfigureBudget(amt, period, pct);
@@ -283,15 +284,14 @@ export default function BudgetManager({
           {isEditingBudget ? (
             <form onSubmit={handleSaveBudget} className="space-y-3.5">
               <div>
-                <label htmlFor="budget-limit-input" className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1">Limit Allocation (INR)</label>
-                <input
-                  type="number"
-                  id="budget-limit-input"
-                  required
-                  value={budgetLimit}
-                  onChange={(e) => setBudgetLimit(e.target.value)}
-                  className={`w-full px-3 py-1.5 bg-stone-900 border ${tokens.border} rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500`}
-                />
+                <label className="text-[10px] uppercase font-bold text-stone-400 font-mono block mb-1">Calculated Limit Ceiling ({currencySymbol})</label>
+                <div className="w-full px-3 py-2 bg-stone-950 border border-stone-850 rounded-xl text-xs font-mono font-bold text-amber-500 flex items-center justify-between">
+                  <span>{currencySymbol}{computedBudgetAmount.toLocaleString('en-IN')}</span>
+                  <span className="text-[9px] uppercase tracking-wider bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded font-black border border-amber-500/20">Auto-Compiled</span>
+                </div>
+                <span className="text-[9px] font-mono text-stone-500 mt-1 block leading-normal">
+                  ⚖️ This total is computed from the sum of dynamic category limits entered beneath. Add/edit category allocations below to adjust.
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -346,7 +346,7 @@ export default function BudgetManager({
                 <h3 className={`text-sm font-bold ${tokens.textPrimary}`}>Limit Ceiling</h3>
                 <span className="text-xs font-mono font-bold text-amber-500 uppercase">{budget.period} Interval</span>
               </div>
-              <p className={`text-3xl font-mono font-black ${tokens.textPrimary}`}>{currencySymbol}{budget.amount.toLocaleString('en-IN')}</p>
+              <p className={`text-3xl font-mono font-black ${tokens.textPrimary}`}>{currencySymbol}{computedBudgetAmount.toLocaleString('en-IN')}</p>
               
               <div className="mt-6">
                 <div className="flex justify-between items-baseline text-xs mb-1">
@@ -929,7 +929,7 @@ export default function BudgetManager({
                   .reduce((sum, e) => sum + e.amount, 0);
                   
                 const hasData = realSpend > 0;
-                const baselineSum = budget.amount > 0 ? budget.amount : 25000;
+                const baselineSum = computedBudgetAmount > 0 ? computedBudgetAmount : 25000;
                 const finalSpend = hasData ? Math.round(realSpend) : 0;
                 const savings = hasData ? Math.max(0, Math.round(baselineSum - finalSpend)) : 0;
                 
@@ -959,7 +959,7 @@ export default function BudgetManager({
                   .reduce((sum, e) => sum + e.amount, 0);
                   
                 const hasData = realSpend > 0;
-                const baseQ = (budget.amount > 0 ? budget.amount : 25000) * 3;
+                const baseQ = (computedBudgetAmount > 0 ? computedBudgetAmount : 25000) * 3;
                 const finalSpend = hasData ? Math.round(realSpend) : 0;
                 const savings = hasData ? Math.max(0, Math.round(baseQ - finalSpend)) : 0;
                 
