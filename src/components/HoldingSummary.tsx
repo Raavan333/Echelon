@@ -182,6 +182,37 @@ export default function HoldingSummary({
   const [forecastYears, setForecastYears] = useState<number>(3);
   const [liveNetOffset, setLiveNetOffset] = useState<number>(0);
 
+  const [modelTrained, setModelTrained] = useState(false);
+  const [modelAccuracy, setModelAccuracy] = useState(88.5);
+  const [modelLoss, setModelLoss] = useState(0.012);
+
+  useEffect(() => {
+    const loadModelParams = () => {
+      try {
+        const storedAccuracy = localStorage.getItem('echelon_model_accuracy');
+        const storedLoss = localStorage.getItem('echelon_model_loss');
+        if (storedAccuracy) {
+          setModelAccuracy(parseFloat(storedAccuracy));
+          setModelTrained(true);
+        }
+        if (storedLoss) {
+          setModelLoss(parseFloat(storedLoss));
+        }
+      } catch (_) {}
+    };
+
+    loadModelParams();
+
+    const handleModelUpdate = () => {
+      loadModelParams();
+    };
+
+    window.addEventListener('echelon_model_update', handleModelUpdate);
+    return () => {
+      window.removeEventListener('echelon_model_update', handleModelUpdate);
+    };
+  }, []);
+
    const activeTaggedIds = taggedBufferAssetIds && taggedBufferAssetIds.length > 0
     ? taggedBufferAssetIds
     : (taggedBufferAssetId ? [taggedBufferAssetId] : []);
@@ -275,61 +306,89 @@ export default function HoldingSummary({
       setLiveNetOffset(prev => prev + (netYieldAmount / (365.25 * 24 * 60 * 60 * 20)));
     }, 50);
     return () => clearInterval(interval);
-  }, [netYieldAmount]);
-
-  // Gamified ranks with dynamic earning velocity and present inflation matrices
+  }, [netYieldAmount]);  // Gamified ranks with comprehensive financial + ML package validation
   const getRankBadgeInfo = (val: number) => {
-    const totalAnnualEarnings = (monthlyEarnings * 12) + onlyAssetsYieldAmount + lentLoansYieldAmount;
-    const activeInflationRate = 0.06; // Present Indian macroeconomic baseline inflation rate (6.0%)
-    const absoluteInflationDrag = Math.max(0, val * activeInflationRate);
-    const netPurchasingFlow = totalAnnualEarnings - absoluteInflationDrag;
+    const totalAnnualEarnings = (Number(monthlyEarnings || 0) * 12) + onlyAssetsYieldAmount + lentLoansYieldAmount;
+    
+    // 1. Assets Portfolio Scaling (max 20 points)
+    const assetPoints = Math.min(20, Math.max(0, val > 0 ? Math.log10(val) * 3.3 : 0));
 
-    const earnsZero = monthlyEarnings === 0 && val === 0;
+    // 2. Liquid Protection / Reserve shield coverage (max 20 points)
+    const liquidCash = assets
+      .filter(a => a.type === 'BANK_BALANCE' || a.type === 'FD')
+      .reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
+    const recentSpends_30d = expenses.reduce((sum, e) => sum + e.amount, 0) || 15000;
+    const emergencyShieldMonths = recentSpends_30d > 0 ? liquidCash / recentSpends_30d : 0;
+    const liquidityPoints = Math.min(20, Math.max(0, Math.min(1.0, emergencyShieldMonths / 6) * 20));
 
-    if (earnsZero) {
+    // 3. Debt Burden Squeeze Immunity (max 20 points)
+    const debtRatio = val > 0 ? totalBorrowedVal / val : totalBorrowedVal > 0 ? 1 : 0;
+    const debtSqueezePoints = Math.min(20, Math.max(0, (1.0 - Math.min(1.0, debtRatio)) * 20));
+
+    // 4. Compound APY vs Macro Inflation (max 20 points)
+    const inflationPoints = Math.min(20, Math.max(0, Math.min(2.5, blendedAPY / 6.0) * 8));
+
+    // 5. Neural Classifier Backprop Validation (max 20 points)
+    let mlPoints = 8; // Baseline Bayesian default weights prior
+    if (modelTrained) {
+      const accuracyScore = (modelAccuracy / 100) * 15; // Max 15 points
+      const lossScore = (1.0 - Math.min(1.0, modelLoss)) * 5; // Max 5 points
+      mlPoints = Math.min(20, accuracyScore + lossScore);
+    }
+
+    const packageScore = assetPoints + liquidityPoints + debtSqueezePoints + inflationPoints + mlPoints;
+    const finalScoreIndex = Math.min(100, Math.max(1, Math.round(packageScore)));
+
+    const earnsZero = Number(monthlyEarnings || 0) <= 0.01 && 
+                      val <= 0.01 && 
+                      onlyAssetsYieldAmount <= 0.01 && 
+                      lentLoansYieldAmount <= 0.01;
+
+    if (earnsZero || (val <= 0.01 && totalAnnualEarnings <= 0.01)) {
       return { 
         name: 'Unfunded Sovereign • L0', 
         color: 'bg-rose-500/10 text-rose-500 border-rose-500/30' + (isLight ? ' text-rose-700 bg-rose-50 border-rose-200' : ''),
-        desc: 'Assets & Earning velocity are absolute zero. Net growth is in severe inflation exposure.'
+        desc: 'Assets & Earning velocity are absolute zero. Net growth is in severe inflation exposure.',
+        score: finalScoreIndex,
+        breakdown: 'A:0% | L:0% | D:0% | I:0% | ML:0%'
       };
     }
 
-    if (netPurchasingFlow <= 0) {
-      return { 
-        name: 'Inflation Deflector • L1', 
-        color: 'bg-zinc-850 text-stone-400 border-zinc-700/50' + (isLight ? ' text-stone-600 bg-stone-100 border-stone-250' : ''),
-        desc: 'Earning velocity and yields are currently losing real purchasing power to 6.0% inflation.'
-      };
-    }
+    const breakdownText = `A:${assetPoints.toFixed(0)}/20 | L:${liquidityPoints.toFixed(0)}/20 | D:${debtSqueezePoints.toFixed(0)}/20 | I:${inflationPoints.toFixed(0)}/20 | ML:${mlPoints.toFixed(0)}/20`;
 
-    // Dynamic purchasing power adjusted networth
-    const inflationAdjustedSurplus = val + (netPurchasingFlow * 0.5);
-
-    if (inflationAdjustedSurplus < 150000) {
+    if (finalScoreIndex < 35) {
       return { 
         name: 'Quiet Apprentice • L1', 
-        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' + (isLight ? ' text-blue-700 bg-blue-50 border-blue-200' : ''),
-        desc: 'Outpacing inflation securely. Accumulating momentum.'
+        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' + (isLight ? ' text-blue-900 bg-blue-50 border-blue-200' : ''),
+        desc: 'Portfolio under baseline configuration. Accumulating dynamic assets and initializing Bayesian classification nodes.',
+        score: finalScoreIndex,
+        breakdown: breakdownText
       };
     }
-    if (inflationAdjustedSurplus < 600000) {
+    if (finalScoreIndex < 60) {
       return { 
         name: 'Capital Vanguard • L2', 
-        color: 'bg-teal-500/10 text-teal-400 border-teal-500/20' + (isLight ? ' text-teal-700 bg-teal-50 border-teal-200' : ''),
-        desc: 'Substantial portfolio expansion, outpacing inflation offsets cleanly.'
+        color: 'bg-[#14b8a6]/10 text-teal-400 border-[#14b8a6]/25' + (isLight ? ' text-teal-800 bg-teal-50 border-teal-200' : ''),
+        desc: 'Stable asset base with resilient liquid reserves. Comfortably outpacing baseline macroeconomic inflation drag.',
+        score: finalScoreIndex,
+        breakdown: breakdownText
       };
     }
-    if (inflationAdjustedSurplus < 1600000) {
+    if (finalScoreIndex < 85) {
       return { 
         name: 'Echelon Commander • L3', 
-        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' + (isLight ? ' text-emerald-700 bg-emerald-50 border-emerald-200' : ''),
-        desc: 'High velocity compound trajectory. Real surplus expansion.'
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' + (isLight ? ' text-emerald-800 bg-emerald-50 border-emerald-250 font-bold' : ''),
+        desc: 'Outstanding passive compounding velocity matched with highly calibrated neural backprop classification.',
+        score: finalScoreIndex,
+        breakdown: breakdownText
       };
     }
     return { 
-      name: 'Sovereign Emperor • L4', 
-      color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' + (isLight ? ' text-amber-700 bg-amber-50 border-amber-200' : ''),
-      desc: 'Absolute capital sovereignty. Portfolio wealth velocity is immune to standard inflation drag.'
+      name: 'Sovereign Archon • L4', 
+      color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' + (isLight ? ' text-amber-800 bg-amber-50 border-amber-250 font-black' : ''),
+      desc: 'Climax of financial harmony. Maximized reserve shields, absolute debt decoupling speed, and high precision ML optimization converges.',
+      score: finalScoreIndex,
+      breakdown: breakdownText
     };
   };
   const rankBadge = getRankBadgeInfo(totalPortfolioValue);
@@ -458,7 +517,21 @@ export default function HoldingSummary({
                   <span>{rankBadge.name}</span>
                 </div>
               </div>
-              <p className={`text-[9.5px] leading-relaxed font-mono ${isLight ? 'text-stone-500' : 'text-stone-400 opacity-80'}`}>
+
+              {/* Package validation score indicators */}
+              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                <span className={`text-[9.2px] font-mono px-2 py-0.5 rounded-md select-none border flex items-center gap-1 ${
+                  isLight ? 'bg-stone-50/80 text-stone-600 border-stone-250/70' : 'bg-black/35 text-stone-300 border-cyan-500/10'
+                }`} title="Calculated from comprehensive multi-variable financial indices and ML classifier backprop precision alignment.">
+                  <Cpu className="h-2.5 w-2.5 text-cyan-500 animate-pulse" />
+                  COHERENCE FIT: <span className="font-extrabold text-[#00f3ff]">{rankBadge.score}%</span>
+                </span>
+                <span className="text-[8.5px] font-mono text-stone-500 uppercase tracking-tight">
+                  ({rankBadge.breakdown})
+                </span>
+              </div>
+
+              <p className={`text-[9.5px] leading-relaxed font-mono ${isLight ? 'text-stone-600' : 'text-stone-400 opacity-80'}`}>
                 🛡️ <span className="font-extrabold uppercase tracking-wide">Cognitive Directive:</span> {rankBadge.desc}
               </p>
             </div>

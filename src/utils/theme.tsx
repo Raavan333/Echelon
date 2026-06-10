@@ -53,134 +53,134 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
   switch (theme.palette) {
     case 'skyblue-peacock':
       tokens = {
-        bg: 'bg-[#ecf3f6]', // Soft cool duck-egg/slate-blue light
-        card: 'bg-white border-[#c9dadf] shadow-xs',
-        cardHover: 'hover:bg-[#f4f7f9] hover:border-[#86a8b3]',
-        textPrimary: 'text-[#1e3d4a]', // highly readable deep petroleum/marine
-        textSecondary: 'text-[#3d5a6c]', // legible secondary cool blue-gray
-        accent: 'bg-[#2f6a7d] text-white font-medium',
-        accentHover: 'hover:bg-[#1e4a59]',
-        accentText: 'text-[#2f6a7d] font-bold',
-        border: 'border-[#cbdfe4]',
-        borderAccent: 'border-[#558291]',
-        buttonBg: 'bg-[#dfecf0] hover:bg-[#cee1e7] text-[#1e3d4a]',
-        glow: 'shadow-[0_2px_12px_rgba(47,106,125,0.06)]',
-        badgeBg: 'bg-[#ebf4f6] text-[#2f6a7d] border border-[#cbdfe4]',
-        badgeText: 'text-[#2f6a7d]'
+        bg: 'bg-[#bae6fd]', // Vibrant crisp sky-blue light background (sky-200)
+        card: 'bg-[#f0f9ff] border-[#0284c7] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#e0f2fe] hover:border-[#0369a1] hover:shadow-lg',
+        textPrimary: 'text-[#0f172a]', // Highly readable deep dark blue-charcoal (very high contrast)
+        textSecondary: 'text-[#1e3a8a]', // Readable royal dark blue
+        accent: 'bg-[#0284c7] text-white font-extrabold hover:bg-[#0369a1]',
+        accentHover: 'hover:bg-[#0369a1]',
+        accentText: 'text-[#0369a1] font-black',
+        border: 'border-[#0284c7]',
+        borderAccent: 'border-[#1d4ed8]',
+        buttonBg: 'bg-[#0284c7] text-white hover:bg-[#0369a1]',
+        glow: 'shadow-[0_4px_15px_rgba(2,132,199,0.15)]',
+        badgeBg: 'bg-[#0284c7]/15 text-[#0369a1] border border-[#0284c7]/40',
+        badgeText: 'text-[#0369a1]'
       };
       break;
 
     case 'hotpink-marble':
       tokens = {
-        bg: 'bg-[#f4ebeb]', // soft dusty light rose-quartz grey
-        card: 'bg-[#faf5f5] border-[#d8c3c3] shadow-xs',
-        cardHover: 'hover:bg-[#fdf3f3] hover:border-[#b39191]',
-        textPrimary: 'text-[#4a3434]', // deep chocolate coffee - highly legible
-        textSecondary: 'text-[#6e5656]', 
-        accent: 'bg-[#a35252] text-white font-medium',
-        accentHover: 'hover:bg-[#853c3c]',
-        accentText: 'text-[#a35252] font-bold',
-        border: 'border-[#e4d3d3]',
-        borderAccent: 'border-[#a37272]',
-        buttonBg: 'bg-[#ebdcd1] hover:bg-[#ebd5cf] text-[#4a3434]',
-        glow: 'shadow-[0_2px_12px_rgba(163,82,82,0.06)]',
-        badgeBg: 'bg-[#f5e9e9] text-[#a35252] border border-[#ebd3d3]',
-        badgeText: 'text-[#a35252]'
+        bg: 'bg-[#fbcfe8]', // Vibrant soft rose-quartz pink base (pink-200)
+        card: 'bg-[#fdf2f8] border-[#db2777] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#fce7f3] hover:border-[#be185d]',
+        textPrimary: 'text-[#4c0519]', // Deep berry maroon/black for maximum contrast
+        textSecondary: 'text-[#9d174d]', // Clear secondary berry
+        accent: 'bg-[#db2777] text-white font-black hover:bg-[#be185d]',
+        accentHover: 'hover:bg-[#be185d]',
+        accentText: 'text-[#db2777] font-black',
+        border: 'border-[#db2777]',
+        borderAccent: 'border-[#9d174d]',
+        buttonBg: 'bg-[#db2777] text-white hover:bg-[#be185d]',
+        glow: 'shadow-[0_4px_15px_rgba(219,39,119,0.15)]',
+        badgeBg: 'bg-[#db2777]/15 text-[#db2777] border border-[#db2777]/40',
+        badgeText: 'text-[#db2777]'
       };
       break;
 
     case 'skyblue':
       tokens = {
-        bg: 'bg-[#ebf1f5]', // Very soothing, cloudy cool grey-blue
-        card: 'bg-white border-[#cad4dc] shadow-xs',
-        cardHover: 'hover:bg-[#f3f6f9] hover:border-[#8da0b0]',
-        textPrimary: 'text-[#243e56]', // deep sea blue, highly legible
-        textSecondary: 'text-[#475b6e]',
-        accent: 'bg-[#3b6082] text-white font-medium',
-        accentHover: 'hover:bg-[#2b4864]',
-        accentText: 'text-[#3b6082] font-bold',
-        border: 'border-[#cbd5e0]',
-        borderAccent: 'border-[#5a86ad]',
-        buttonBg: 'bg-[#e2edf6] hover:bg-[#d0e0ee] text-[#243e56]',
-        glow: 'shadow-[0_2px_12px_rgba(59,96,130,0.06)]',
-        badgeBg: 'bg-[#e9f1f7] text-[#3b6082] border border-[#cbd5e0]',
-        badgeText: 'text-[#3b6082]'
+        bg: 'bg-[#bfdbfe]', // Crisp blue-200 background
+        card: 'bg-[#eff6ff] border-[#2563eb] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#dbeafe] hover:border-[#1d4ed8]',
+        textPrimary: 'text-[#1e3a8a]', // Highly legible deep royal blue/black
+        textSecondary: 'text-[#1d4ed8]',
+        accent: 'bg-[#2563eb] text-white font-extrabold hover:bg-[#1d4ed8]',
+        accentHover: 'hover:bg-[#1d4ed8]',
+        accentText: 'text-[#2563eb] font-black',
+        border: 'border-[#2563eb]',
+        borderAccent: 'border-[#1e3a8a]',
+        buttonBg: 'bg-[#2563eb] text-white hover:bg-[#1d4ed8]',
+        glow: 'shadow-[0_4px_15px_rgba(37,99,235,0.15)]',
+        badgeBg: 'bg-[#2563eb]/15 text-[#2563eb] border border-[#2563eb]/40',
+        badgeText: 'text-[#2563eb]'
       };
       break;
 
     case 'pure-light':
       tokens = {
-        bg: 'bg-[#f0f2f5]', // Cool clean slate-dust
-        card: 'bg-white border-[#ced4da] shadow-xs',
-        cardHover: 'hover:bg-[#f8f9fa] hover:border-[#adb5bd]',
-        textPrimary: 'text-[#212529]', // dark slate-charcoal (very readable)
-        textSecondary: 'text-[#495057]',
-        accent: 'bg-[#343a40] text-white font-medium',
-        accentHover: 'hover:bg-[#212529]',
-        accentText: 'text-[#343a40] font-bold',
-        border: 'border-[#dee2e6]',
-        borderAccent: 'border-[#495057]',
-        buttonBg: 'bg-[#e9ecef] hover:bg-[#dee2e6] text-[#212529]',
-        glow: 'shadow-[0_2px_12px_rgba(33,37,41,0.05)]',
-        badgeBg: 'bg-[#e9ecef] text-[#343a40] border border-[#dee2e6]',
-        badgeText: 'text-[#343a40]'
+        bg: 'bg-[#cbd5e1]', // Visible slate-300 base
+        card: 'bg-[#f8fafc] border-[#475569] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#f1f5f9] hover:border-[#1e293b]',
+        textPrimary: 'text-[#0f172a]', // Crisp graphite black
+        textSecondary: 'text-[#1e293b]',
+        accent: 'bg-[#0f172a] text-white font-black hover:bg-[#1e293b]',
+        accentHover: 'hover:bg-[#1e293b]',
+        accentText: 'text-[#0f172a] font-black',
+        border: 'border-[#475569]',
+        borderAccent: 'border-[#0f172a]',
+        buttonBg: 'bg-[#0f172a] text-white hover:bg-[#192130]',
+        glow: 'shadow-[0_4px_15px_rgba(15,23,42,0.1)]',
+        badgeBg: 'bg-[#475569]/15 text-[#0f172a] border border-[#475569]/40',
+        badgeText: 'text-[#0f172a]'
       };
       break;
 
     case 'sand-drift':
       tokens = {
-        bg: 'bg-[#f4efe8]', // Warm but soft soothing sand dune oatmeal (no bright blinding yellow)
-        card: 'bg-white border-[#dcd3c5] shadow-xs',
-        cardHover: 'hover:bg-[#faf7f3] hover:border-[#bda585]',
-        textPrimary: 'text-[#4e3f30]', // gorgeous elegant deep espresso wood, ultra legible
-        textSecondary: 'text-[#70604f]',
-        accent: 'bg-[#8c6f4f] text-white font-medium',
-        accentHover: 'hover:bg-[#70553a]',
-        accentText: 'text-[#8c6f4f] font-bold',
-        border: 'border-[#e8e2d8]',
-        borderAccent: 'border-[#a88d6c]',
-        buttonBg: 'bg-[#efece6] hover:bg-[#e4dfd4] text-[#4e3f30]',
-        glow: 'shadow-[0_2px_12px_rgba(140,111,79,0.06)]',
-        badgeBg: 'bg-[#f8f6f2] text-[#8c6f4f] border border-[#e8e2d8]',
-        badgeText: 'text-[#8c6f4f]'
+        bg: 'bg-[#fed7aa]', // Bright warm orange-200 light environment
+        card: 'bg-[#fff7ed] border-[#ea580c] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#ffedd5] hover:border-[#c2410c]',
+        textPrimary: 'text-[#431407]', // Rich deep espresso-burnt-wood
+        textSecondary: 'text-[#9a3412]',
+        accent: 'bg-[#ea580c] text-white font-black hover:bg-[#c2410c]',
+        accentHover: 'hover:bg-[#c2410c]',
+        accentText: 'text-[#ea580c] font-black',
+        border: 'border-[#ea580c]',
+        borderAccent: 'border-[#9a3412]',
+        buttonBg: 'bg-[#ea580c] text-white hover:bg-[#c2410c]',
+        glow: 'shadow-[0_4px_15px_rgba(234,88,12,0.15)]',
+        badgeBg: 'bg-[#ea580c]/15 text-[#ea580c] border border-[#ea580c]/40',
+        badgeText: 'text-[#ea580c]'
       };
       break;
 
     case 'lavender-blush':
       tokens = {
-        bg: 'bg-[#ede9f2]', // Soft, dreamy pastel lavender-mist
-        card: 'bg-white border-[#cfc4db] shadow-xs',
-        cardHover: 'hover:bg-[#f6f3f8] hover:border-[#9b86b3]',
-        textPrimary: 'text-[#3e2365]', // Deep navy-purple, highly readable
-        textSecondary: 'text-[#5d4481]',
-        accent: 'bg-[#6d4c9f] text-white font-medium',
-        accentHover: 'hover:bg-[#583b83]',
-        accentText: 'text-[#6d4c9f] font-bold',
-        border: 'border-[#ddd5e7]',
-        borderAccent: 'border-[#9278bd]',
-        buttonBg: 'bg-[#eeddf3] hover:bg-[#e4cced] text-[#3e2365]',
-        glow: 'shadow-[0_2px_12px_rgba(109,76,159,0.06)]',
-        badgeBg: 'bg-[#f4eef9] text-[#6d4c9f] border border-[#ddd5e7]',
-        badgeText: 'text-[#6d4c9f]'
+        bg: 'bg-[#e9d5ff]', // Soft purple-200 base
+        card: 'bg-[#faf5ff] border-[#7c3aed] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#f3e8ff] hover:border-[#6d28d9]',
+        textPrimary: 'text-[#3b0764]', // Pure indigo-grape black
+        textSecondary: 'text-[#5b21b6]',
+        accent: 'bg-[#7c3aed] text-white font-black hover:bg-[#6d28d9]',
+        accentHover: 'hover:bg-[#6d28d9]',
+        accentText: 'text-[#7c3aed] font-black',
+        border: 'border-[#7c3aed]',
+        borderAccent: 'border-[#5b21b6]',
+        buttonBg: 'bg-[#7c3aed] text-white hover:bg-[#6d28d9]',
+        glow: 'shadow-[0_4px_15px_rgba(124,58,237,0.15)]',
+        badgeBg: 'bg-[#7c3aed]/15 text-[#7c3aed] border border-[#7c3aed]/40',
+        badgeText: 'text-[#7c3aed]'
       };
       break;
 
     case 'mint-fresh':
       tokens = {
-        bg: 'bg-[#ebf2ee]', // calm cool eucalyptus/sage light green
-        card: 'bg-white border-[#cad7cf] shadow-xs',
-        cardHover: 'hover:bg-[#f3f7f5] hover:border-[#8ca697]',
-        textPrimary: 'text-[#1e3c2c]', // beautiful deep pine green, ultra legible
-        textSecondary: 'text-[#3a5848]',
-        accent: 'bg-[#3b7556] text-white font-medium',
-        accentHover: 'hover:bg-[#2b5a40]',
-        accentText: 'text-[#3b7556] font-bold',
-        border: 'border-[#cbded3]',
-        borderAccent: 'border-[#5fa37b]',
-        buttonBg: 'bg-[#e2ede7] hover:bg-[#cfded4] text-[#1e3c2c]',
-        glow: 'shadow-[0_2px_12px_rgba(59,117,86,0.05)]',
-        badgeBg: 'bg-[#e9f2ee] text-[#3b7556] border border-[#cbded3]',
-        badgeText: 'text-[#3b7556]'
+        bg: 'bg-[#bbf7d0]', // Calm green-200 environment
+        card: 'bg-[#f0fdf4] border-[#16a34a] border-2 shadow-md rounded-2xl',
+        cardHover: 'hover:bg-[#dcfce7] hover:border-[#15803d]',
+        textPrimary: 'text-[#14532d]', // Deep forest pine green (high contrast)
+        textSecondary: 'text-[#15803d]',
+        accent: 'bg-[#16a34a] text-white font-black hover:bg-[#15803d]',
+        accentHover: 'hover:bg-[#15803d]',
+        accentText: 'text-[#16a34a] font-black',
+        border: 'border-[#16a34a]',
+        borderAccent: 'border-[#15803d]',
+        buttonBg: 'bg-[#16a34a] text-white hover:bg-[#15803d]',
+        glow: 'shadow-[0_4px_15px_rgba(22,163,74,0.12)]',
+        badgeBg: 'bg-[#16a34a]/15 text-[#14532d] border border-[#16a34a]/40',
+        badgeText: 'text-[#14532d]'
       };
       break;
     case 'stealth-gold':

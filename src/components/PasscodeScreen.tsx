@@ -190,13 +190,13 @@ export default function PasscodeScreen({
   };
 
   return (
-    <div id="secure-unlock-screen" className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 ${tokens.bg} font-mono text-xs transition-colors duration-500`}>
+    <div id="secure-unlock-screen" className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 sm:p-6 ${tokens.bg} font-mono text-xs transition-colors duration-500`}>
       
       {/* Blueprint grid lines layout */}
       <div className={`absolute inset-0 bg-grid-pattern ${isLight ? 'opacity-5' : 'opacity-10'} pointer-events-none select-none`} />
       <div className={`absolute top-0 inset-x-0 h-44 bg-gradient-to-b ${isLight ? 'from-sky-500/5' : 'from-cyan-500/5'} to-transparent blur-3xl pointer-events-none`} />
 
-      <div className={`w-full max-w-sm p-8 rounded-3xl ${tokens.card} ${tokens.glow} border text-center relative overflow-hidden transition-all duration-300 ${shake ? 'animate-bounce' : ''}`}>
+      <div className={`w-full max-w-md p-8 sm:p-11 py-10 sm:py-12 rounded-3xl ${tokens.card} ${tokens.glow} border text-center relative overflow-hidden transition-all duration-300 ${shake ? 'animate-bounce' : ''}`}>
         
         {/* Glowing laser scanning horizontal swipe */}
         <div className={`absolute inset-x-0 top-0 h-[1.5px] ${isLight ? 'bg-sky-400/20' : 'bg-cyan-550/30'} pointer-events-none`} />
@@ -328,14 +328,14 @@ export default function PasscodeScreen({
         )}
 
         {/* Interactive Keypad dial */}
-        <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto mb-2">
+        <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto mb-2 mt-2">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
             <button
               key={num}
               type="button"
               id={`dial-btn-${num}`}
               onClick={() => handleKeyPress(num)}
-              className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
+              className={`h-11 sm:h-13 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm sm:text-base font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
                 isLight 
                   ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-stone-850 shadow-xs' 
                   : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-stone-100/90 hover:border-stone-700'
@@ -348,7 +348,7 @@ export default function PasscodeScreen({
             type="button"
             id="dial-btn-clear"
             onClick={handleClear}
-            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] uppercase font-bold rounded-xl ${
+            className={`h-11 sm:h-13 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] sm:text-[10px] uppercase font-bold rounded-xl ${
               isLight 
                 ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-pink-600 hover:border-pink-300' 
                 : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-pink-500 hover:border-pink-500/45'
@@ -360,7 +360,7 @@ export default function PasscodeScreen({
             type="button"
             id="dial-btn-0"
             onClick={() => handleKeyPress('0')}
-            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
+            className={`h-11 sm:h-13 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm sm:text-base font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
               isLight 
                 ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-stone-850 shadow-xs' 
                 : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-stone-100/90 hover:border-stone-700'
@@ -372,7 +372,7 @@ export default function PasscodeScreen({
             type="button"
             id="dial-btn-backspace"
             onClick={handleBackspace}
-            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] uppercase font-bold rounded-xl hover:scale-105 active:scale-95 ${
+            className={`h-11 sm:h-13 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] sm:text-[10px] uppercase font-bold rounded-xl hover:scale-105 active:scale-95 ${
               isLight 
                 ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-teal-600 hover:border-teal-300 shadow-xs' 
                 : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-teal-400 hover:border-teal-500/45'

@@ -289,49 +289,99 @@ export default function App() {
   const playSystemSound = (type: 'tick' | 'error' | 'success' | 'notify' | 'cyber') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      
       if (type === 'tick') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1400, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        osc.frequency.setValueAtTime(2400, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.045);
+        gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.045);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.05);
+        osc.stop(audioCtx.currentTime + 0.045);
       } else if (type === 'success') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-        osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.08); // A5
-        osc.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.16); // D6
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        const now = audioCtx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.07);
+          gain.gain.setValueAtTime(0.035, now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.26);
+        });
+      } else if (type === 'notify') {
+        // Deep suspense cinematic alert swell
+        const osc = audioCtx.createOscillator();
+        const oscSub = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(130, audioCtx.currentTime + 0.65);
+        
+        oscSub.type = 'sine';
+        oscSub.frequency.setValueAtTime(65, audioCtx.currentTime);
+        oscSub.frequency.linearRampToValueAtTime(52, audioCtx.currentTime + 0.65);
+        
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(320, audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(0.045, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.65);
+        
+        osc.connect(filter);
+        oscSub.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        oscSub.start();
+        osc.stop(audioCtx.currentTime + 0.66);
+        oscSub.stop(audioCtx.currentTime + 0.66);
+      } else if (type === 'cyber') {
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(75, audioCtx.currentTime);
+        osc1.frequency.linearRampToValueAtTime(250, audioCtx.currentTime + 1.25);
+        
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(112.5, audioCtx.currentTime);
+        osc2.frequency.linearRampToValueAtTime(375, audioCtx.currentTime + 1.25);
+        
+        gain.gain.setValueAtTime(0.008, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.045, audioCtx.currentTime + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.25);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc1.start();
+        osc2.start();
+        osc1.stop(audioCtx.currentTime + 1.26);
+        osc2.stop(audioCtx.currentTime + 1.26);
+      } else if (type === 'error') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime); 
+        osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.4);
-      } else if (type === 'notify') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(900, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1350, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } else if (type === 'cyber') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(950, audioCtx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.25);
+        osc.stop(audioCtx.currentTime + 0.35);
       }
     } catch (_) {}
   };
@@ -1798,6 +1848,7 @@ export default function App() {
 
   // Active theme parameters
   const tokens = getColorTokens(vaultData.theme);
+  const isLight = vaultData.theme.mode === 'light';
   const activeColor = vaultData.activeAccentColor || '#f59e0b';
   const activeCustomTheme = vaultData && vaultData.theme.palette.startsWith('custom-')
     ? (vaultData.customThemeConfigs || []).find(c => `custom-${c.id}` === vaultData.theme.palette)
@@ -1929,8 +1980,8 @@ export default function App() {
                     {/* Active alerts list */}
                     <div className="space-y-2">
                       {unacknowledgedAlerts.length === 0 ? (
-                        <div className="py-4 border border-dashed border-stone-800 rounded-xl text-center">
-                          <p className="text-[11px] font-mono text-emerald-400">✓ ALL BOUNDARIES COMPLIANT</p>
+                        <div className={`py-4 border border-dashed rounded-xl text-center ${isLight ? 'border-zinc-300' : 'border-stone-800'}`}>
+                          <p className={`text-[11px] font-mono ${isLight ? 'text-emerald-700 font-bold' : 'text-emerald-400'}`}>✓ ALL BOUNDARIES COMPLIANT</p>
                         </div>
                       ) : (
                         <div className="space-y-2 overflow-hidden">
@@ -1945,9 +1996,11 @@ export default function App() {
                                   exit={{ height: 0, opacity: 0 }}
                                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
                                 >
-                                  <div className="py-2 px-3 bg-rose-950/10 border-l-2 border-rose-500/40 rounded-r-xl flex flex-col gap-2 select-none">
+                                  <div className={`py-2 px-3 border-l-2 rounded-r-xl flex flex-col gap-2 select-none ${
+                                    isLight ? 'bg-rose-50 border-rose-500' : 'bg-rose-950/15 border-rose-400'
+                                  }`}>
                                     <div className="flex-1">
-                                      <p className="text-xs text-stone-200 leading-relaxed font-sans">{alertItem.message}</p>
+                                      <p className={`text-xs leading-relaxed font-sans ${isLight ? 'text-stone-900 font-medium' : 'text-stone-200'}`}>{alertItem.message}</p>
                                       {rule.id.startsWith("bond-interest-payout-") && (
                                         <button
                                           type="button"
@@ -3641,7 +3694,7 @@ export default function App() {
       )}
 
       {/* FOOTER METRICS */}
-      <footer className="max-w-7xl mx-auto px-4 mt-8 pb-32 pt-8 border-t border-stone-850/30 text-center text-[10.5px] text-stone-500 font-mono space-y-2">
+      <footer className="max-w-7xl mx-auto px-4 mt-4 pb-20 sm:pb-24 pt-3 border-t border-stone-850/30 text-center text-[10px] text-stone-500 font-mono space-y-1">
         <p className="text-stone-300 font-semibold tracking-wider font-display uppercase">Echelon: Build Quiet Wealth</p>
         <p>Protected with military-grade client-side AES-256 vault security</p>
         <p>Version 1.1.2</p>

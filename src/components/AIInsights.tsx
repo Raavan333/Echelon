@@ -44,59 +44,103 @@ interface AIInsightsProps {
 }
 
 // Retro-alien cyber-tech sound synthesizers using Web Audio API
-const playCyberChirp = (type: 'beep' | 'success' | 'train' | 'alert') => {
+const playCyberChirp = (type: 'beep' | 'success' | 'train' | 'alert' | 'outlog') => {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (type === 'beep') {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch A5
-      osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.frequency.setValueAtTime(2400, audioCtx.currentTime); 
+      osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.045);
+      gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.045);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.15);
-    } else if (type === 'success') {
+      osc.stop(audioCtx.currentTime + 0.045);
+    } else if (type === 'outlog') {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); // E5
-      osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16); // G5
-      osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.24); // C6
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+      osc.frequency.setValueAtTime(1350, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(950, audioCtx.currentTime + 0.01);
+      gain.gain.setValueAtTime(0.012, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.02);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.45);
+      osc.stop(audioCtx.currentTime + 0.02);
+    } else if (type === 'success') {
+      const now = audioCtx.currentTime;
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.07);
+        gain.gain.setValueAtTime(0.035, now + i * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.07);
+        osc.stop(now + i * 0.07 + 0.26);
+      });
     } else if (type === 'train') {
-      const osc = audioCtx.createOscillator();
+      // Bold, suspenseful charging sweeps hum
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(110, audioCtx.currentTime); // Low bass buzz
-      osc.frequency.linearRampToValueAtTime(220, audioCtx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-      osc.connect(gain);
+      
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(75, audioCtx.currentTime);
+      osc1.frequency.linearRampToValueAtTime(250, audioCtx.currentTime + 1.25);
+      
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(112.5, audioCtx.currentTime);
+      osc2.frequency.linearRampToValueAtTime(375, audioCtx.currentTime + 1.25);
+      
+      gain.gain.setValueAtTime(0.008, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.045, audioCtx.currentTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.25);
+      
+      osc1.connect(gain);
+      osc2.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.1);
+      
+      osc1.start();
+      osc2.start();
+      osc1.stop(audioCtx.currentTime + 1.26);
+      osc2.stop(audioCtx.currentTime + 1.26);
     } else if (type === 'alert') {
+      // Deep suspense cinematic alert
       const osc = audioCtx.createOscillator();
+      const oscSub = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(330, audioCtx.currentTime); // E4 alarms
-      osc.frequency.linearRampToValueAtTime(150, audioCtx.currentTime + 0.35);
-      gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.38);
-      osc.connect(gain);
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(130, audioCtx.currentTime + 0.65);
+      
+      oscSub.type = 'sine';
+      oscSub.frequency.setValueAtTime(65, audioCtx.currentTime);
+      oscSub.frequency.linearRampToValueAtTime(52, audioCtx.currentTime + 0.65);
+      
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(320, audioCtx.currentTime);
+      
+      gain.gain.setValueAtTime(0.045, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.65);
+      
+      osc.connect(filter);
+      oscSub.connect(filter);
+      filter.connect(gain);
       gain.connect(audioCtx.destination);
+      
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.4);
+      oscSub.start();
+      osc.stop(audioCtx.currentTime + 0.66);
+      oscSub.stop(audioCtx.currentTime + 0.66);
     }
   } catch (e) {
     // Web audio blocked or unsupported
@@ -213,11 +257,17 @@ export default function AIInsights({
   ]);
 
   // Cyberweights matrix parameters that visually update as model "learns" user variables
-  const [modelWeights, setModelWeights] = useState({
-    spendWeight: 0.85,
-    debtPenetrationRatio: 0.62,
-    APYAccumulationVector: 0.74,
-    reserveShieldCoeff: 0.55
+  const [modelWeights, setModelWeights] = useState(() => {
+    try {
+      const stored = localStorage.getItem('echelon_model_weights');
+      if (stored) return JSON.parse(stored);
+    } catch (_) {}
+    return {
+      spendWeight: 0.85,
+      debtPenetrationRatio: 0.62,
+      APYAccumulationVector: 0.74,
+      reserveShieldCoeff: 0.55
+    };
   });
 
   const [mlDetails, setMlDetails] = useState<{
@@ -226,12 +276,30 @@ export default function AIInsights({
     learningRate: number;
     weightKeys: string[];
     weightValues: number[];
-  }>({
-    losses: [0.75, 0.61, 0.48, 0.35, 0.22, 0.12, 0.08, 0.04, 0.02, 0.011],
-    accuracy: 88.5,
-    learningRate: 0.05,
-    weightKeys: ['swiggy→Dining', 'uber→Transport', 'amazon→Shopping', 'rent→Rent', 'dmart→Groceries'],
-    weightValues: [6.8, 5.2, 7.1, 8.4, 4.9]
+  }>(() => {
+    try {
+      const storedAccuracy = localStorage.getItem('echelon_model_accuracy');
+      const storedLoss = localStorage.getItem('echelon_model_loss');
+      if (storedAccuracy && storedLoss) {
+        // Construct some reasonable historic simulated losses down to final
+        const lastLoss = parseFloat(storedLoss);
+        const acc = parseFloat(storedAccuracy);
+        return {
+          losses: [0.75, 0.61, 0.48, 0.35, 0.22, 0.12, 0.08, 0.04, 0.02, lastLoss],
+          accuracy: acc,
+          learningRate: 0.05,
+          weightKeys: ['swiggy→Dining', 'uber→Transport', 'amazon→Shopping', 'rent→Rent', 'dmart→Groceries'],
+          weightValues: [6.8, 5.2, 7.1, 8.4, 4.9]
+        };
+      }
+    } catch (_) {}
+    return {
+      losses: [0.75, 0.61, 0.48, 0.35, 0.22, 0.12, 0.08, 0.04, 0.02, 0.011],
+      accuracy: 88.5,
+      learningRate: 0.05,
+      weightKeys: ['swiggy→Dining', 'uber→Transport', 'amazon→Shopping', 'rent→Rent', 'dmart→Groceries'],
+      weightValues: [6.8, 5.2, 7.1, 8.4, 4.9]
+    };
   });
 
   // SMS Permission and AutoLOG simulation engine states
@@ -385,7 +453,7 @@ export default function AIInsights({
     }
 
     setScore(Math.min(100, Math.max(10, s)));
-  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets.length, usdConversionRate, monthlyEarnings, loans.length]);
+  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets, usdConversionRate, monthlyEarnings, loans, expenses]);
 
   const getRank = (scr: number) => {
     if (scr >= 90) return { title: 'Sovereign Emperor', level: 'MAX_SECURE', color: 'text-amber-400 border-amber-500/30' };
@@ -408,6 +476,12 @@ export default function AIInsights({
     setEpoch(0);
     setLoss(0.85);
 
+    // Initial state setup for real-time charting
+    setMlDetails(prev => ({
+      ...prev,
+      losses: [0.85]
+    }));
+
     if (soundEnabled) playCyberChirp('train');
 
     const cats = budgetCategoryLimits && budgetCategoryLimits.length > 0 
@@ -422,7 +496,7 @@ export default function AIInsights({
 
     let currentEpoch = 0;
     const interval = setInterval(async () => {
-      currentEpoch += 5;
+      currentEpoch += 2;
       if (currentEpoch > 100) {
         clearInterval(interval);
 
@@ -443,12 +517,22 @@ export default function AIInsights({
         const expensesImpact = Math.min(1, recentSpends_30d / (monthlyEarnings || 15000));
         const debtImpact = Math.min(1, totalBorrowedVal / (totalAssetsVal || 1));
 
-        setModelWeights({
+        const finalWeights = {
           spendWeight: Number((0.2 + expensesImpact * 0.8).toFixed(3)),
           debtPenetrationRatio: Number(debtImpact.toFixed(3)),
           APYAccumulationVector: Number((blendedAPY / 25).toFixed(3)),
           reserveShieldCoeff: Number((Math.min(1, emergencyShieldMonths / 12)).toFixed(3))
-        });
+        };
+
+        setModelWeights(finalWeights);
+
+        try {
+          localStorage.setItem('echelon_model_weights', JSON.stringify(finalWeights));
+          localStorage.setItem('echelon_model_accuracy', result.accuracy.toFixed(1));
+          localStorage.setItem('echelon_model_loss', result.losses[result.losses.length - 1].toFixed(5));
+          localStorage.setItem('echelon_model_trained_at', Date.now().toString());
+          window.dispatchEvent(new Event('echelon_model_update'));
+        } catch (_) {}
 
         setTrainingLogs(prev => [
           ...prev,
@@ -462,6 +546,19 @@ export default function AIInsights({
         const tempLoss = Math.max(0.012, 0.85 - (currentEpoch / 100) * 0.83 + (Math.random() - 0.5) * 0.04);
         setLoss(tempLoss);
         setEpoch(currentEpoch);
+
+        // Feed steps into real-time SVG charting
+        setMlDetails(prev => {
+          const currentLosses = [...prev.losses, tempLoss];
+          // Limit list length to fit display viewport correctly
+          if (currentLosses.length > 24) {
+            currentLosses.shift();
+          }
+          return {
+            ...prev,
+            losses: currentLosses
+          };
+        });
 
         const progressPercent = currentEpoch;
         const trainLogsPool = [
@@ -478,11 +575,11 @@ export default function AIInsights({
           `[${new Date().toLocaleTimeString()}] [EPOCH_${currentEpoch}/100] loss: ${tempLoss.toFixed(4)} -- ${logPhrase}`
         ]);
 
-        if (soundEnabled && currentEpoch % 15 === 0) {
-          playCyberChirp('train');
+        if (soundEnabled) {
+          playCyberChirp('outlog');
         }
       }
-    }, 45);
+    }, 120);
   };
 
   // Generate actual relevant AI alerts and insights
@@ -1029,60 +1126,117 @@ export default function AIInsights({
         </div>
       )}
 
-      {activeTab === 'model' && (
-        <div id="sgd-neural-training-deck" className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full animate-fade-in py-2">
-          
-          {/* LEFT SIDE: DECISION VECTOR COEFFICIENTS & NEURAL CORE */}
-          <div className={`lg:col-span-6 p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group ${
-            isLight ? 'bg-white border-stone-200 shadow-xs' : 'border-cyan-500/15 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.06)]'
-          }`}>
-            <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent ${isLight ? 'via-stone-300' : 'via-cyan-500/40'} to-transparent`} />
+      {activeTab === 'model' && (() => {
+        const liveSpendWeight = isTraining 
+          ? Math.min(10.0, Math.max(0.1, (modelWeights.spendWeight * 10) + Math.sin(epoch * 0.5) * 1.5 + (Math.random() - 0.5) * 0.5))
+          : modelWeights.spendWeight * 10;
+
+        const liveDebtWeight = isTraining
+          ? Math.min(10.0, Math.max(0.1, (modelWeights.debtPenetrationRatio * 10) + Math.cos(epoch * 0.45) * 1.2 + (Math.random() - 0.5) * 0.4))
+          : modelWeights.debtPenetrationRatio * 10;
+
+        const liveApyWeight = isTraining
+          ? Math.min(10.0, Math.max(0.1, (modelWeights.APYAccumulationVector * 10) + Math.sin(epoch * 0.6) * 1.7 + (Math.random() - 0.5) * 0.5))
+          : modelWeights.APYAccumulationVector * 10;
+
+        const liveReserveWeight = isTraining
+          ? Math.min(10.0, Math.max(0.1, (modelWeights.reserveShieldCoeff * 10) + Math.cos(epoch * 0.55) * 1.4 + (Math.random() - 0.5) * 0.5))
+          : modelWeights.reserveShieldCoeff * 10;
+
+        const leftPanelTrainingClass = isTraining 
+          ? (isLight 
+              ? 'bg-rose-50/70 border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.15)] scale-[1.005] ring-1 ring-rose-300' 
+              : 'border-rose-500/50 bg-[#0f0406] shadow-[0_0_35px_rgba(244,63,94,0.25)] scale-[1.005] ring-1 ring-rose-950')
+          : (isLight 
+              ? 'bg-white border-stone-200 shadow-xs' 
+              : 'border-cyan-500/15 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.06)]');
+
+        const rightPanelTrainingClass = isTraining 
+          ? (isLight 
+              ? 'bg-rose-50/70 border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.15)] scale-[1.005]' 
+              : 'border-rose-500/50 bg-[#0f0406] shadow-[0_0_35px_rgba(244,63,94,0.25)] scale-[1.005]')
+          : (isLight 
+              ? 'bg-white border-stone-200 shadow-xs' 
+              : 'border-cyan-500/15 bg-[#080811]/95');
+
+        return (
+          <div id="sgd-neural-training-deck" className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full animate-fade-in py-2">
+            <style>{`
+              @keyframes laserSweep {
+                0% { top: 0%; }
+                50% { top: 100%; }
+                100% { top: 0%; }
+              }
+            `}</style>
             
-            <div>
-              <div className={`flex items-center justify-between mb-4 pb-2 border-b ${isLight ? 'border-stone-100' : 'border-cyan-500/10'}`}>
-                <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? tokens.textPrimary : neuralColors.accent}`}>NEURAL COHERENT COEFFICIENTS</span>
-                <span className={`text-[9px] font-mono ${isLight ? 'text-stone-400' : 'text-stone-500'}`}>COEFF_MATRIX_V2</span>
-              </div>
+            {/* LEFT SIDE: DECISION VECTOR COEFFICIENTS & NEURAL CORE */}
+            <div className={`p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group transition-all duration-300 ${leftPanelTrainingClass}`}>
+              {isTraining && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-35 z-10">
+                  <div className="w-full h-full bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03))] bg-[size:100%_4px,3px_100%] animate-pulse" />
+                  <div className="absolute left-0 right-0 h-0.5 bg-rose-500/80 blur-[1px] animate-laser-sweep" style={{ animation: 'laserSweep 2.5s linear infinite' }} />
+                </div>
+              )}
+              
+              <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent ${isLight ? 'via-stone-300' : 'via-cyan-500/40'} to-transparent`} />
+              
+              <div>
+                {isTraining && (
+                  <div className={`text-center py-1.5 px-3 text-[9px] font-black tracking-widest font-mono uppercase animate-pulse mb-3 rounded-md border ${
+                    isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30'
+                  }`}>
+                    ⚠️ WARNING: SGD CORES ACTIVE. HIGH UNCERTAINTY DECAY PROCESS RUNNING.
+                  </div>
+                )}
 
-              {/* Coefficients weights list */}
-              <div className="space-y-4 py-3">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px]">
-                    <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>OUTFLOW_SPEND_WEIGHT (W0)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.spendWeight * 10).toFixed(2)}</span>
-                  </div>
-                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
-                    <div 
-                      className={`h-full rounded-full transition-all duration-550 ${neuralColors.bgProgress} ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_var(--neural-accent)]'}`}
-                      style={{ width: `${modelWeights.spendWeight * 100}%`, '--neural-accent': neuralColors.hex } as React.CSSProperties}
-                    />
-                  </div>
-                  <span className="text-[8.5px] text-stone-500 block leading-none">Scales based on discretionary expenses velocity</span>
+                <div className={`flex items-center justify-between mb-4 pb-2 border-b ${isLight ? 'border-stone-100' : 'border-cyan-500/10'}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? tokens.textPrimary : neuralColors.accent}`}>
+                    {isTraining ? 'MUTATING DECISION COEFFICIENTS' : 'NEURAL COHERENT COEFFICIENTS'}
+                  </span>
+                  <span className={`text-[9px] font-mono ${isLight ? 'text-stone-400' : 'text-stone-500'}`}>
+                    {isTraining ? 'GRADIENT_MUTATION_v2.8' : 'COEFF_MATRIX_V2'}
+                  </span>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px]">
-                    <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>DEBT_DRAG_PENETRATION (W1)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.debtPenetrationRatio * 10).toFixed(2)}</span>
+                {/* Coefficients weights list */}
+                <div className="space-y-4 py-3">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>OUTFLOW_SPEND_WEIGHT (W0)</span>
+                      <span className={`font-bold font-mono ${isTraining ? 'text-rose-500 animate-pulse font-black' : (isLight ? tokens.accentText : neuralColors.accent)}`}>{liveSpendWeight.toFixed(2)}</span>
+                    </div>
+                    <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-800'}`}>
+                      <div 
+                        className={`h-full rounded-full transition-all duration-75 ${isTraining ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)]' : (neuralColors.bgProgress + (isLight ? ' shadow-[0_0_2px_rgba(0,0,0,0.1)]' : ' shadow-[0_0_8px_var(--neural-accent)]'))}`}
+                        style={{ width: `${liveSpendWeight * 10}%`, '--neural-accent': neuralColors.hex } as React.CSSProperties}
+                      />
+                    </div>
+                    <span className="text-[8.5px] text-stone-500 block leading-none">Scales based on discretionary expenses velocity</span>
                   </div>
-                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
-                    <div 
-                      className={`h-full bg-pink-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(236,72,153,0.5)]'}`}
-                      style={{ width: `${modelWeights.debtPenetrationRatio * 100}%` }}
-                    />
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>DEBT_DRAG_PENETRATION (W1)</span>
+                      <span className={`font-bold font-mono ${isTraining ? 'text-rose-500 animate-pulse font-black' : (isLight ? tokens.accentText : neuralColors.accent)}`}>{liveDebtWeight.toFixed(2)}</span>
+                    </div>
+                    <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-800'}`}>
+                      <div 
+                        className={`h-full rounded-full transition-all duration-75 ${isTraining ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)]' : `bg-pink-500 ${isLight ? 'shadow-[0_0_2px_rgba(0,0,0,0.1)]' : 'shadow-[0_0_8px_rgba(236,72,153,0.5)]'}`}`}
+                        style={{ width: `${liveDebtWeight * 10}%` }}
+                      />
+                    </div>
+                    <span className="text-[8.5px] text-stone-500 block leading-none">Measures liability drag on portfolio compound velocity</span>
                   </div>
-                  <span className="text-[8.5px] text-stone-500 block leading-none">Measures liability drag on portfolio compound velocity</span>
-                </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>APY_COMPOUND_ACCEL (W2)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.APYAccumulationVector * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isTraining ? 'text-rose-500 animate-pulse font-black' : (isLight ? tokens.accentText : neuralColors.accent)}`}>{liveApyWeight.toFixed(2)}</span>
                   </div>
-                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-800'}`}>
                     <div 
-                      className={`h-full bg-amber-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(242,158,11,0.5)]'}`}
-                      style={{ width: `${modelWeights.APYAccumulationVector * 100}%` }}
+                      className={`h-full rounded-full transition-all duration-75 ${isTraining ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)]' : `bg-amber-500 ${isLight ? 'shadow-[0_0_2px_rgba(0,0,0,0.1)]' : 'shadow-[0_0_8px_rgba(242,158,11,0.5)]'}`}`}
+                      style={{ width: `${liveApyWeight * 10}%` }}
                     />
                   </div>
                   <span className="text-[8.5px] text-stone-500 block leading-none">Accelerates exponentially as blended yield rates increase</span>
@@ -1091,12 +1245,12 @@ export default function AIInsights({
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>LIQUID_RESERVE_SHIELD (W3)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.reserveShieldCoeff * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isTraining ? 'text-rose-500 animate-pulse font-black' : (isLight ? tokens.accentText : neuralColors.accent)}`}>{liveReserveWeight.toFixed(2)}</span>
                   </div>
-                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-800'}`}>
                     <div 
-                      className={`h-full bg-emerald-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}
-                      style={{ width: `${modelWeights.reserveShieldCoeff * 100}%` }}
+                      className={`h-full rounded-full transition-all duration-75 ${isTraining ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)]' : `bg-emerald-500 ${isLight ? 'shadow-[0_0_2px_rgba(0,0,0,0.1)]' : 'shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}`}
+                      style={{ width: `${liveReserveWeight * 10}%` }}
                     />
                   </div>
                   <span className="text-[8.5px] text-stone-500 block leading-none">Tracks liquidity reserves defense margin against emergency outflows</span>
@@ -1388,50 +1542,10 @@ export default function AIInsights({
               </div>
             </div>
 
-            {/* NEURAL TRAINING TERMINAL CONSOLE LOGS */}
-            <div className={`p-4 rounded-2xl border flex flex-col justify-between ${
-              isLight ? 'bg-stone-900 text-stone-300 border-stone-800' : 'border-cyan-500/15 bg-black/85'
-            }`}>
-              <div className="flex items-center justify-between pb-2 border-b border-stone-800 mb-2">
-                <div className="flex items-center gap-1.5">
-                  <span className={`h-1.5 w-1.5 rounded-full ${isTraining ? 'bg-cyan-400 animate-ping' : 'bg-stone-600'}`} />
-                  <span className="text-[9.5px] font-black font-mono uppercase tracking-widest text-[#00f3ff]">OPTIMIZER_STDOUT_MONITOR</span>
-                </div>
-                <span className="text-[8px] font-mono text-stone-600 font-bold uppercase select-none">BUFFER: DIRECT-COFFER</span>
-              </div>
-
-              {/* Console Logs list */}
-              <div 
-                id="neural-console-output-shell" 
-                className="h-32 overflow-y-auto font-mono text-[9px] text-zinc-400 space-y-1 pr-1.5 flex flex-col-reverse justify-start scrollbar-thin scrollbar-thumb-zinc-805"
-              >
-                {[...trainingLogs].reverse().map((line, idx) => (
-                  <div key={idx} className="leading-snug transition-all duration-350 hover:bg-stone-800/20 px-1 py-0.5 rounded">
-                    <span className="text-stone-500 font-black select-none mr-1">ECHELON_CORE:~ dev$</span>
-                    {line.startsWith('[') ? (
-                      <span className={
-                        line.includes('SUCCESS') || line.includes('CONVERGED') || line.includes('COMPILER')
-                          ? 'text-emerald-400 font-bold'
-                          : line.includes('SYS_') || line.includes('MUTATION')
-                          ? neuralColors.accentText
-                          : line.includes('loss:')
-                          ? 'text-pink-400'
-                          : 'text-stone-300'
-                      }>
-                        {line}
-                      </span>
-                    ) : (
-                      <span className="text-zinc-300">{line}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
           </div>
 
         </div>
-      )}
+      )})()}
 
       {activeTab === 'sms' && (
         <div id="sms-unification-terminal" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
