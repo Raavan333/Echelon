@@ -53,134 +53,134 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
   switch (theme.palette) {
     case 'skyblue-peacock':
       tokens = {
-        bg: 'bg-gradient-to-br from-sky-100 to-teal-50',
-        card: 'bg-white border-sky-300 shadow-sm',
-        cardHover: 'hover:bg-sky-50/70 hover:border-teal-500 hover:shadow-[0_4px_16px_rgba(10,147,150,0.1)]',
-        textPrimary: 'text-[#005f73]',
-        textSecondary: 'text-[#0a9396]',
-        accent: 'bg-[#005f73] text-white font-medium',
-        accentHover: 'hover:bg-[#004b5c]',
-        accentText: 'text-[#005f73] font-bold',
-        border: 'border-sky-200',
-        borderAccent: 'border-teal-500',
-        buttonBg: 'bg-sky-100 hover:bg-sky-200 text-[#005f73]',
-        glow: 'shadow-[0_0_15px_rgba(10,147,150,0.15)]',
-        badgeBg: 'bg-teal-50 text-[#005f73] border border-teal-200',
-        badgeText: 'text-[#005f73]'
+        bg: 'bg-[#ecf3f6]', // Soft cool duck-egg/slate-blue light
+        card: 'bg-white border-[#c9dadf] shadow-xs',
+        cardHover: 'hover:bg-[#f4f7f9] hover:border-[#86a8b3]',
+        textPrimary: 'text-[#1e3d4a]', // highly readable deep petroleum/marine
+        textSecondary: 'text-[#3d5a6c]', // legible secondary cool blue-gray
+        accent: 'bg-[#2f6a7d] text-white font-medium',
+        accentHover: 'hover:bg-[#1e4a59]',
+        accentText: 'text-[#2f6a7d] font-bold',
+        border: 'border-[#cbdfe4]',
+        borderAccent: 'border-[#558291]',
+        buttonBg: 'bg-[#dfecf0] hover:bg-[#cee1e7] text-[#1e3d4a]',
+        glow: 'shadow-[0_2px_12px_rgba(47,106,125,0.06)]',
+        badgeBg: 'bg-[#ebf4f6] text-[#2f6a7d] border border-[#cbdfe4]',
+        badgeText: 'text-[#2f6a7d]'
       };
       break;
 
     case 'hotpink-marble':
       tokens = {
-        bg: 'bg-gradient-to-tr from-stone-50 via-zinc-100 to-[#fff5f7]',
-        card: 'bg-white border-zinc-250 shadow-sm',
-        cardHover: 'hover:bg-[#fff0f5] hover:border-pink-500 hover:shadow-[0_4px_16px_rgba(219,39,119,0.08)]',
-        textPrimary: 'text-stone-800',
-        textSecondary: 'text-zinc-650',
-        accent: 'bg-pink-600 text-white font-medium',
-        accentHover: 'hover:bg-pink-700',
-        accentText: 'text-pink-600 font-bold',
-        border: 'border-zinc-200',
-        borderAccent: 'border-pink-500',
-        buttonBg: 'bg-[#fff0f5] hover:bg-pink-100 text-pink-700',
-        glow: 'shadow-[0_0_15px_rgba(219,39,119,0.15)]',
-        badgeBg: 'bg-[#fff0f5] text-pink-700 border border-pink-200',
-        badgeText: 'text-pink-700'
+        bg: 'bg-[#f4ebeb]', // soft dusty light rose-quartz grey
+        card: 'bg-[#faf5f5] border-[#d8c3c3] shadow-xs',
+        cardHover: 'hover:bg-[#fdf3f3] hover:border-[#b39191]',
+        textPrimary: 'text-[#4a3434]', // deep chocolate coffee - highly legible
+        textSecondary: 'text-[#6e5656]', 
+        accent: 'bg-[#a35252] text-white font-medium',
+        accentHover: 'hover:bg-[#853c3c]',
+        accentText: 'text-[#a35252] font-bold',
+        border: 'border-[#e4d3d3]',
+        borderAccent: 'border-[#a37272]',
+        buttonBg: 'bg-[#ebdcd1] hover:bg-[#ebd5cf] text-[#4a3434]',
+        glow: 'shadow-[0_2px_12px_rgba(163,82,82,0.06)]',
+        badgeBg: 'bg-[#f5e9e9] text-[#a35252] border border-[#ebd3d3]',
+        badgeText: 'text-[#a35252]'
       };
       break;
 
     case 'skyblue':
       tokens = {
-        bg: 'bg-sky-100',
-        card: 'bg-white border-sky-200/80 shadow-sm',
-        cardHover: 'hover:bg-sky-50/50 hover:border-sky-400',
-        textPrimary: 'text-sky-950',
-        textSecondary: 'text-sky-800/80',
-        accent: 'bg-sky-600 text-white font-medium',
-        accentHover: 'hover:bg-sky-700',
-        accentText: 'text-sky-600',
-        border: 'border-sky-200',
-        borderAccent: 'border-sky-500',
-        buttonBg: 'bg-sky-200 hover:bg-sky-300 text-sky-950',
-        glow: 'shadow-[0_0_15px_rgba(14,165,233,0.15)]',
-        badgeBg: 'bg-sky-100 text-sky-800 border border-sky-200',
-        badgeText: 'text-sky-950'
+        bg: 'bg-[#ebf1f5]', // Very soothing, cloudy cool grey-blue
+        card: 'bg-white border-[#cad4dc] shadow-xs',
+        cardHover: 'hover:bg-[#f3f6f9] hover:border-[#8da0b0]',
+        textPrimary: 'text-[#243e56]', // deep sea blue, highly legible
+        textSecondary: 'text-[#475b6e]',
+        accent: 'bg-[#3b6082] text-white font-medium',
+        accentHover: 'hover:bg-[#2b4864]',
+        accentText: 'text-[#3b6082] font-bold',
+        border: 'border-[#cbd5e0]',
+        borderAccent: 'border-[#5a86ad]',
+        buttonBg: 'bg-[#e2edf6] hover:bg-[#d0e0ee] text-[#243e56]',
+        glow: 'shadow-[0_2px_12px_rgba(59,96,130,0.06)]',
+        badgeBg: 'bg-[#e9f1f7] text-[#3b6082] border border-[#cbd5e0]',
+        badgeText: 'text-[#3b6082]'
       };
       break;
 
     case 'pure-light':
       tokens = {
-        bg: 'bg-stone-50',
-        card: 'bg-white border-stone-200 shadow-sm',
-        cardHover: 'hover:bg-stone-50/50 hover:border-stone-400',
-        textPrimary: 'text-stone-900',
-        textSecondary: 'text-stone-600',
-        accent: 'bg-stone-900 text-white font-medium',
-        accentHover: 'hover:bg-stone-850',
-        accentText: 'text-stone-900',
-        border: 'border-stone-200',
-        borderAccent: 'border-stone-900',
-        buttonBg: 'bg-stone-200 hover:bg-stone-300 text-stone-900',
-        glow: 'shadow-[0_0_10px_rgba(41,37,36,0.05)]',
-        badgeBg: 'bg-stone-100 text-stone-900 border border-stone-200',
-        badgeText: 'text-stone-900'
+        bg: 'bg-[#f0f2f5]', // Cool clean slate-dust
+        card: 'bg-white border-[#ced4da] shadow-xs',
+        cardHover: 'hover:bg-[#f8f9fa] hover:border-[#adb5bd]',
+        textPrimary: 'text-[#212529]', // dark slate-charcoal (very readable)
+        textSecondary: 'text-[#495057]',
+        accent: 'bg-[#343a40] text-white font-medium',
+        accentHover: 'hover:bg-[#212529]',
+        accentText: 'text-[#343a40] font-bold',
+        border: 'border-[#dee2e6]',
+        borderAccent: 'border-[#495057]',
+        buttonBg: 'bg-[#e9ecef] hover:bg-[#dee2e6] text-[#212529]',
+        glow: 'shadow-[0_2px_12px_rgba(33,37,41,0.05)]',
+        badgeBg: 'bg-[#e9ecef] text-[#343a40] border border-[#dee2e6]',
+        badgeText: 'text-[#343a40]'
       };
       break;
 
     case 'sand-drift':
       tokens = {
-        bg: 'bg-[#fdf6e3]',
-        card: 'bg-[#f5ecdf] border-[#e4d4c1] shadow-sm',
-        cardHover: 'hover:bg-[#eae0d2] hover:border-[#b58900]',
-        textPrimary: 'text-[#2c2421]',
-        textSecondary: 'text-[#5c4f48]',
-        accent: 'bg-[#b58900] text-white font-medium',
-        accentHover: 'hover:bg-[#a07800]',
-        accentText: 'text-[#b58900]',
-        border: 'border-[#e4d4c1]',
-        borderAccent: 'border-[#b58900]',
-        buttonBg: 'bg-[#ebd9c1] hover:bg-[#e0caa9] text-[#2c2421]',
-        glow: 'shadow-[0_0_12px_rgba(181,137,0,0.15)]',
-        badgeBg: 'bg-[#f5ecdf] text-[#b58900] border border-[#e4d4c1]',
-        badgeText: 'text-[#2c2421]'
+        bg: 'bg-[#f4efe8]', // Warm but soft soothing sand dune oatmeal (no bright blinding yellow)
+        card: 'bg-white border-[#dcd3c5] shadow-xs',
+        cardHover: 'hover:bg-[#faf7f3] hover:border-[#bda585]',
+        textPrimary: 'text-[#4e3f30]', // gorgeous elegant deep espresso wood, ultra legible
+        textSecondary: 'text-[#70604f]',
+        accent: 'bg-[#8c6f4f] text-white font-medium',
+        accentHover: 'hover:bg-[#70553a]',
+        accentText: 'text-[#8c6f4f] font-bold',
+        border: 'border-[#e8e2d8]',
+        borderAccent: 'border-[#a88d6c]',
+        buttonBg: 'bg-[#efece6] hover:bg-[#e4dfd4] text-[#4e3f30]',
+        glow: 'shadow-[0_2px_12px_rgba(140,111,79,0.06)]',
+        badgeBg: 'bg-[#f8f6f2] text-[#8c6f4f] border border-[#e8e2d8]',
+        badgeText: 'text-[#8c6f4f]'
       };
       break;
 
     case 'lavender-blush':
       tokens = {
-        bg: 'bg-[#faf5ff]',
-        card: 'bg-white border-purple-200 shadow-md',
-        cardHover: 'hover:bg-purple-50/50 hover:border-purple-400',
-        textPrimary: 'text-[#3b0764]',
-        textSecondary: 'text-[#581c87]',
-        accent: 'bg-[#8b5cf6] text-white font-medium',
-        accentHover: 'hover:bg-[#7c3aed]',
-        accentText: 'text-[#8b5cf6]',
-        border: 'border-purple-200',
-        borderAccent: 'border-purple-500',
-        buttonBg: 'bg-purple-100 hover:bg-purple-200 text-[#3b0764]',
-        glow: 'shadow-[0_0_15px_rgba(139,92,246,0.15)]',
-        badgeBg: 'bg-purple-50 text-purple-750 border border-purple-200',
-        badgeText: 'text-[#3b0764]'
+        bg: 'bg-[#ede9f2]', // Soft, dreamy pastel lavender-mist
+        card: 'bg-white border-[#cfc4db] shadow-xs',
+        cardHover: 'hover:bg-[#f6f3f8] hover:border-[#9b86b3]',
+        textPrimary: 'text-[#3e2365]', // Deep navy-purple, highly readable
+        textSecondary: 'text-[#5d4481]',
+        accent: 'bg-[#6d4c9f] text-white font-medium',
+        accentHover: 'hover:bg-[#583b83]',
+        accentText: 'text-[#6d4c9f] font-bold',
+        border: 'border-[#ddd5e7]',
+        borderAccent: 'border-[#9278bd]',
+        buttonBg: 'bg-[#eeddf3] hover:bg-[#e4cced] text-[#3e2365]',
+        glow: 'shadow-[0_2px_12px_rgba(109,76,159,0.06)]',
+        badgeBg: 'bg-[#f4eef9] text-[#6d4c9f] border border-[#ddd5e7]',
+        badgeText: 'text-[#6d4c9f]'
       };
       break;
 
     case 'mint-fresh':
       tokens = {
-        bg: 'bg-[#f0fdf4]',
-        card: 'bg-white border-emerald-200 shadow-sm',
-        cardHover: 'hover:bg-emerald-50/50 hover:border-emerald-400',
-        textPrimary: 'text-emerald-950',
-        textSecondary: 'text-emerald-800',
-        accent: 'bg-emerald-600 text-white font-medium',
-        accentHover: 'hover:bg-emerald-700',
-        accentText: 'text-emerald-600',
-        border: 'border-emerald-200',
-        borderAccent: 'border-emerald-500',
-        buttonBg: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950',
-        glow: 'shadow-[0_0_15px_rgba(16,185,129,0.12)]',
-        badgeBg: 'bg-emerald-50 text-emerald-900 border border-emerald-200',
-        badgeText: 'text-emerald-950'
+        bg: 'bg-[#ebf2ee]', // calm cool eucalyptus/sage light green
+        card: 'bg-white border-[#cad7cf] shadow-xs',
+        cardHover: 'hover:bg-[#f3f7f5] hover:border-[#8ca697]',
+        textPrimary: 'text-[#1e3c2c]', // beautiful deep pine green, ultra legible
+        textSecondary: 'text-[#3a5848]',
+        accent: 'bg-[#3b7556] text-white font-medium',
+        accentHover: 'hover:bg-[#2b5a40]',
+        accentText: 'text-[#3b7556] font-bold',
+        border: 'border-[#cbded3]',
+        borderAccent: 'border-[#5fa37b]',
+        buttonBg: 'bg-[#e2ede7] hover:bg-[#cfded4] text-[#1e3c2c]',
+        glow: 'shadow-[0_2px_12px_rgba(59,117,86,0.05)]',
+        badgeBg: 'bg-[#e9f2ee] text-[#3b7556] border border-[#cbded3]',
+        badgeText: 'text-[#3b7556]'
       };
       break;
     case 'stealth-gold':

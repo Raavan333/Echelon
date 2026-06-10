@@ -74,14 +74,30 @@ function SpeedometerDial({
   const clampedRate = Math.min(maxRate, Math.max(0, rate));
   const angle = (clampedRate / maxRate) * 180 - 180; // Angle from -180 to 0 degrees for semidial
 
+  const isLight = theme.mode === 'light';
+
   const colorConfig = {
-    cyan: { line: '#00f3ff', glow: 'rgba(0, 243, 255, 0.4)', text: 'text-[#00f3ff]', badge: 'bg-cyan-500/10 border-cyan-500/20' },
-    pink: { line: '#ec4899', glow: 'rgba(236, 72, 153, 0.4)', text: 'text-pink-500', badge: 'bg-pink-500/10 border-pink-500/20' },
-    amber: { line: '#f59e0b', glow: 'rgba(245, 158, 11, 0.4)', text: 'text-amber-500', badge: 'bg-amber-500/10 border-amber-500/20' }
+    cyan: { 
+      line: isLight ? '#0f766e' : '#00f3ff', 
+      glow: isLight ? 'rgba(15, 118, 110, 0.15)' : 'rgba(0, 243, 255, 0.4)', 
+      text: isLight ? 'text-teal-700' : 'text-[#00f3ff]', 
+      badge: isLight ? 'bg-teal-50 border-teal-200 text-teal-800' : 'bg-cyan-500/10 border-cyan-500/20' 
+    },
+    pink: { 
+      line: '#ec4899', 
+      glow: 'rgba(236, 72, 153, 0.4)', 
+      text: isLight ? 'text-pink-700' : 'text-pink-500', 
+      badge: isLight ? 'bg-pink-50 border-pink-200 text-pink-800' : 'bg-pink-500/10 border-pink-500/20' 
+    },
+    amber: { 
+      line: '#f59e0b', 
+      glow: 'rgba(245, 158, 11, 0.4)', 
+      text: isLight ? 'text-amber-800' : 'text-amber-500', 
+      badge: isLight ? 'bg-amber-50 border-amber-250 text-amber-900 font-bold' : 'bg-amber-500/10 border-amber-500/20' 
+    }
   }[colorTheme];
 
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
 
   return (
     <div className={`flex-1 min-w-0 p-2 sm:p-3 rounded-2xl flex flex-col justify-between items-center group/card relative overflow-hidden transition-all duration-300 border ${
@@ -109,19 +125,19 @@ function SpeedometerDial({
             strokeLinecap="round"
             style={{ filter: `drop-shadow(0 0 4px ${colorConfig.glow})` }}
           />
-          {/* Semicircle needle */}
-          <line 
-            x1="50" 
-            y1="50" 
-            x2="50" 
-            y2="15" 
-            stroke="#ffffff" 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            transform={`rotate(${angle + 90}, 50, 50)`}
-            style={{ transformOrigin: '50% 50%' }}
-          />
-          <circle cx="50" cy="50" r="4.5" fill="#ffffff" />
+      {/* 2. Semicircle needle */}
+      <line 
+        x1="50" 
+        y1="50" 
+        x2="50" 
+        y2="15" 
+        stroke={isLight ? "#334155" : "#ffffff"} 
+        strokeWidth="2.5" 
+        strokeLinecap="round" 
+        transform={`rotate(${angle + 90}, 50, 50)`}
+        style={{ transformOrigin: '50% 50%' }}
+      />
+      <circle cx="50" cy="50" r="4.5" fill={isLight ? "#334155" : "#ffffff"} />
         </svg>
         <div className="absolute inset-x-0 bottom-0 text-center leading-none">
           <span className={`text-[9px] sm:text-[11.5px] font-mono font-black ${colorConfig.text}`}>
@@ -130,8 +146,8 @@ function SpeedometerDial({
         </div>
       </div>
 
-      <div className="w-full mt-1.5 pt-1.5 border-t border-stone-900/60 flex flex-col items-center">
-        <div className="text-[9px] sm:text-[11.5px] font-mono font-black text-white truncate max-w-full">{amount}</div>
+      <div className={`w-full mt-1.5 pt-1.5 border-t ${isLight ? 'border-stone-200' : 'border-stone-900/60'} flex flex-col items-center`}>
+        <div className={`text-[9px] sm:text-[11.5px] font-mono font-black ${isLight ? 'text-stone-850' : 'text-white'} truncate max-w-full`}>{amount}</div>
         <span className={`text-[7px] sm:text-[8px] font-mono font-bold uppercase ${colorConfig.text} mt-0.5 whitespace-nowrap`}>
           {yearlyImpact}
         </span>
@@ -171,6 +187,7 @@ export default function HoldingSummary({
     : (taggedBufferAssetId ? [taggedBufferAssetId] : []);
 
   const tokens = getColorTokens(theme);
+  const isLight = theme.mode === 'light';
 
   // Totals calculations
   const totalAssetsVal = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
@@ -351,26 +368,28 @@ export default function HoldingSummary({
     <div id="holding-summary-dashboard" className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
       
       {/* 1. MASTER ASSET RADAR CELL (NET WORTH) */}
-      <div className={`lg:col-span-2 p-6 rounded-3xl border border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col justify-between transition-all duration-300 relative`}>
+      <div className={`lg:col-span-2 p-6 rounded-3xl border flex flex-col justify-between transition-all duration-300 relative ${
+        isLight ? 'bg-white border-stone-200 shadow-xs' : 'border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+      }`}>
         {/* Neon decorative scan overlay */}
         <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00f3ff] to-transparent animate-pulse" />
+        <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-${isLight ? 'stone-300' : '[#00f3ff]'} to-transparent animate-pulse`} />
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-xs uppercase font-black tracking-widest text-[#00f3ff]">NET COOPERATIVE TREASURY LEDGER</span>
+            <span className={`text-xs uppercase font-black tracking-widest ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>NET COOPERATIVE TREASURY LEDGER</span>
             <div className="flex items-center gap-1 text-[11px] text-stone-400 font-mono">
-              <ShieldCheck className="h-4 w-4 text-[#00f3ff]" />
+              <ShieldCheck className={`h-4 w-4 ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`} />
               <span>SEC_LOG_VERIFIED</span>
             </div>
           </div>
           
           <div className="flex flex-col gap-3 mb-2">
             <div className="flex items-baseline flex-wrap gap-1">
-              <h2 className={`text-4xl sm:text-5xl font-mono font-extrabold tracking-tight text-white drop-shadow-[0_0_8px_rgba(0,243,255,0.4)]`}>
+              <h2 className={`text-4xl sm:text-5xl font-mono font-extrabold tracking-tight ${isLight ? tokens.textPrimary : 'text-white drop-shadow-[0_0_8px_rgba(0,243,255,0.4)]'}`}>
                 {currencySymbol}{Math.floor(totalPortfolioValue + liveNetOffset).toLocaleString('en-IN')}
               </h2>
-              <span className="text-xl sm:text-2xl font-mono font-extrabold text-cyan-400 tracking-tight animate-pulse shrink-0">
+              <span className={`text-xl sm:text-2xl font-mono font-extrabold tracking-tight animate-pulse shrink-0 ${isLight ? tokens.textPrimary : 'text-cyan-400'}`}>
                 .{(Math.round(((totalPortfolioValue + liveNetOffset) % 1) * 100)).toString().padStart(2, '0')}
               </span>
             </div>
@@ -431,10 +450,10 @@ export default function HoldingSummary({
         </div>
 
         {/* 2. COMPOUND CHANNELS SLIDESHOW WITH RETRO MAIN-GRID STYLING */}
-        <div className="mt-8 pt-4 border-t border-cyan-500/10">
+        <div className={`mt-8 pt-4 border-t ${isLight ? 'border-stone-250/60' : 'border-cyan-500/10'}`}>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className={`text-xs font-black uppercase text-[#00f3ff] tracking-wider`}>COOPERATIVE TREASURY ACCUMULATION PROJECTION</h3>
+              <h3 className={`text-xs font-black uppercase ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'} tracking-wider`}>COOPERATIVE TREASURY ACCUMULATION PROJECTION</h3>
               <p className="text-[9.5px] text-stone-500">Compounded projection channels across model constraints</p>
             </div>
             
@@ -523,14 +542,16 @@ export default function HoldingSummary({
       </div>
 
       {/* 3. DONUT DISTRIBUTION & DIRECTORY ALLOCATIONS */}
-      <div className={`p-6 rounded-3xl border border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col justify-between transition-all duration-300 relative`}>
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00f3ff] to-transparent animate-pulse" />
+      <div className={`p-6 rounded-3xl border flex flex-col justify-between transition-all duration-300 relative ${
+        isLight ? 'bg-white border-stone-200 shadow-xs' : 'border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+      }`}>
+        <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-${isLight ? 'stone-300' : '[#00f3ff]'} to-transparent animate-pulse`} />
 
         <div>
-          <span className="text-xs uppercase font-black tracking-widest text-[#00f3ff] font-mono block mb-4">CAPITAL PIE MATRIX</span>
+          <span className={`text-xs uppercase font-black tracking-widest ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'} font-mono block mb-4`}>CAPITAL PIE MATRIX</span>
           
           {totalPie === 0 ? (
-            <div className="h-40 flex items-center justify-center text-[10px] text-stone-500 border border-dashed border-stone-850 rounded-xl bg-black">
+            <div className={`h-40 flex items-center justify-center text-[10px] text-stone-500 border border-dashed rounded-xl ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-black border-stone-850'}`}>
               Zero allocation channels detected. Instantiate holdings inside Assets ledger.
             </div>
           ) : (
@@ -538,7 +559,7 @@ export default function HoldingSummary({
               {/* Dynamic SVG Donut Chart */}
               <div className="relative w-36 h-36 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="35" fill="transparent" stroke="#090a12" strokeWidth="11" />
+                  <circle cx="50" cy="50" r="35" fill="transparent" stroke={isLight ? '#f1f5f9' : '#090a12'} strokeWidth="11" />
                   {categories.map((c, idx) => {
                     // Accumulate percentage angles for donut slices
                     const prevAmountSum = categories.slice(0, idx).reduce((sum, item) => sum + item.amount, 0);
@@ -569,7 +590,7 @@ export default function HoldingSummary({
                 {/* Visual weighted portfolio APY center metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-tight text-center px-2">
                   <span className="text-[9px] uppercase font-black text-stone-500 font-mono">Assets APY</span>
-                  <span className={`text-xs font-black font-mono text-[#00f3ff] drop-shadow-[0_0_4px_rgba(0,243,255,0.4)]`}>
+                  <span className={`text-xs font-black font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff] drop-shadow-[0_0_4px_rgba(0,243,255,0.4)]'}`}>
                     {assetsOnlyAPY.toFixed(1)}% APY
                   </span>
                 </div>
@@ -611,8 +632,8 @@ export default function HoldingSummary({
                 >
                   <div className="flex items-center gap-2 shrink-0 min-w-[120px]">
                     <div className="h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: c.color }} />
-                    <span className="font-bold text-xs text-stone-300 font-display">{c.label}</span>
-                    <span className="text-[9px] font-mono text-cyan-400 font-bold bg-cyan-500/10 px-1 py-0.2 rounded">
+                    <span className={`font-bold text-xs font-display ${isLight ? 'text-stone-800' : 'text-stone-300'}`}>{c.label}</span>
+                    <span className={`text-[9px] font-mono font-bold px-1 py-0.2 rounded ${isLight ? 'text-teal-700 bg-teal-50 border border-teal-200/50' : 'text-cyan-400 bg-cyan-500/10'}`}>
                       {((c.amount / totalPie) * 100).toFixed(0)}%
                     </span>
                   </div>
@@ -621,9 +642,11 @@ export default function HoldingSummary({
                     <div className="absolute right-0 -top-[5.5px] text-[8px] font-bold text-stone-600 group-hover:text-cyan-400">&gt;</div>
                   </div>
 
-                  <div className="w-full sm:w-auto sm:max-w-[180px] p-2 bg-stone-900 border border-stone-800 rounded-lg group-hover:border-cyan-500/20 transition-all">
+                  <div className={`w-full sm:w-auto sm:max-w-[180px] p-2 rounded-lg transition-all border ${
+                    isLight ? 'bg-stone-50 border-stone-200 group-hover:border-teal-500/30' : 'bg-stone-900 border-stone-800 group-hover:border-cyan-500/20'
+                  }`}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[9.5px] font-bold font-mono text-white">
+                      <span className={`text-[9.5px] font-bold font-mono ${isLight ? 'text-stone-850 font-black' : 'text-white'}`}>
                         {currencySymbol}{c.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </span>
                     </div>

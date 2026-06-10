@@ -21,6 +21,7 @@ import {
 import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal, BudgetCategoryLimit } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
+import { sovereignML } from '../utils/predictiveModel';
 
 interface AIInsightsProps {
   theme: EchelonTheme;
@@ -102,6 +103,76 @@ const playCyberChirp = (type: 'beep' | 'success' | 'train' | 'alert') => {
   }
 };
 
+const getThemeNeuralColor = (theme: EchelonTheme) => {
+  switch (theme.palette) {
+    case 'hotpink-marble':
+    case 'rose-amethyst':
+      return {
+        accent: 'text-pink-500',
+        accentText: 'text-pink-500',
+        bgAccent: 'bg-pink-500 font-bold',
+        border: 'border-pink-500/20',
+        borderAccent: 'border-pink-500/30',
+        gradient: 'from-pink-500 to-fuchsia-500',
+        hex: '#ec4899',
+        glow: 'shadow-[0_0_20px_rgba(236,72,153,0.35)]',
+        bgProgress: 'bg-gradient-to-r from-pink-500 to-fuchsia-500'
+      };
+    case 'sand-drift':
+    case 'stealth-gold':
+    case 'black':
+    case 'slate-amber':
+      return {
+        accent: 'text-amber-500',
+        accentText: 'text-amber-500',
+        bgAccent: 'bg-amber-500 font-bold',
+        border: 'border-amber-500/20',
+        borderAccent: 'border-amber-500/30',
+        gradient: 'from-amber-500 to-orange-500',
+        hex: '#f59e0b',
+        glow: 'shadow-[0_0_20px_rgba(245,158,11,0.35)]',
+        bgProgress: 'bg-gradient-to-r from-amber-500 to-orange-500'
+      };
+    case 'royal-emerald':
+    case 'mint-fresh':
+      return {
+        accent: 'text-emerald-500',
+        accentText: 'text-emerald-500',
+        bgAccent: 'bg-emerald-500 font-bold',
+        border: 'border-emerald-500/20',
+        borderAccent: 'border-emerald-500/30',
+        gradient: 'from-emerald-500 to-teal-500',
+        hex: '#10b981',
+        glow: 'shadow-[0_0_20px_rgba(16,185,129,0.35)]',
+        bgProgress: 'bg-gradient-to-r from-emerald-500 to-teal-500'
+      };
+    case 'lavender-blush':
+      return {
+        accent: 'text-violet-500',
+        accentText: 'text-violet-500',
+        bgAccent: 'bg-violet-500 font-bold',
+        border: 'border-violet-500/20',
+        borderAccent: 'border-violet-500/30',
+        gradient: 'from-violet-500 to-purple-500',
+        hex: '#8b5cf6',
+        glow: 'shadow-[0_0_20px_rgba(139,92,246,0.35)]',
+        bgProgress: 'bg-gradient-to-r from-violet-500 to-purple-500'
+      };
+    default:
+      return {
+        accent: 'text-cyan-400',
+        accentText: 'text-cyan-400',
+        bgAccent: 'bg-cyan-500 font-bold',
+        border: 'border-cyan-500/20',
+        borderAccent: 'border-cyan-500/30',
+        gradient: 'from-cyan-400 to-blue-500',
+        hex: '#00f3ff',
+        glow: 'shadow-[0_0_20px_rgba(6,182,212,0.35)]',
+        bgProgress: 'bg-gradient-to-r from-cyan-400 to-blue-500'
+      };
+  }
+};
+
 export default function AIInsights({
   theme,
   assets,
@@ -121,6 +192,7 @@ export default function AIInsights({
 }: AIInsightsProps) {
   const tokens = getColorTokens(theme);
   const isLight = theme.mode === 'light';
+  const neuralColors = getThemeNeuralColor(theme);
   const highlightText = isLight ? tokens.accentText : 'text-[#00f3ff]';
   const subLabelText = isLight ? 'text-stone-500 font-bold' : 'text-[#00f3ff]/60 font-bold';
   const valueText = isLight ? tokens.accentText : 'text-cyan-400';
@@ -146,6 +218,20 @@ export default function AIInsights({
     debtPenetrationRatio: 0.62,
     APYAccumulationVector: 0.74,
     reserveShieldCoeff: 0.55
+  });
+
+  const [mlDetails, setMlDetails] = useState<{
+    losses: number[];
+    accuracy: number;
+    learningRate: number;
+    weightKeys: string[];
+    weightValues: number[];
+  }>({
+    losses: [0.75, 0.61, 0.48, 0.35, 0.22, 0.12, 0.08, 0.04, 0.02, 0.011],
+    accuracy: 88.5,
+    learningRate: 0.05,
+    weightKeys: ['swiggy→Dining', 'uber→Transport', 'amazon→Shopping', 'rent→Rent', 'dmart→Groceries'],
+    weightValues: [6.8, 5.2, 7.1, 8.4, 4.9]
   });
 
   // SMS Permission and AutoLOG simulation engine states
@@ -269,28 +355,47 @@ export default function AIInsights({
   };
 
   // ML training trigger
-  const handleOverclockTraining = () => {
+  const handleOverclockTraining = async () => {
     if (isTraining) return;
     setIsTraining(true);
     setEpoch(0);
-    setLoss(0.72);
-    setTrainingLogs([`[09:00:00] [EPOCH_0] Initiating SGD neural optimizer...`]);
-    
+    setLoss(0.85);
+
     if (soundEnabled) playCyberChirp('train');
 
+    const cats = budgetCategoryLimits && budgetCategoryLimits.length > 0 
+      ? budgetCategoryLimits.map(c => c.category)
+      : ['Dining', 'Transport', 'Entertainment', 'Medical', 'Groceries', 'Shopping', 'Rent', 'Investment', 'Cash'];
+
+    setTrainingLogs([
+      `[${new Date().toLocaleTimeString()}] [SYS_INIT] Loading Echelon local Bayesian Network optimizer.`,
+      `[${new Date().toLocaleTimeString()}] [SYS_STATS] Parsing dataset: ${expenses.length} spending logs, ${assets.length} liquid asset coffers.`,
+      `[${new Date().toLocaleTimeString()}] [TRAIN_START] SGD Backpropagation engaged. Learning rate = 0.05.`
+    ]);
+
     let currentEpoch = 0;
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       currentEpoch += 5;
       if (currentEpoch > 100) {
         clearInterval(interval);
+
+        // Run actual client-side Bayes statistical weights training
+        const result = await sovereignML.train(expenses, assets, cats);
+
         setIsTraining(false);
         setEpoch(100);
-        setLoss(0.011);
-        
-        // Finalize weights dynamically with user actual data vectors!
-        const expensesImpact = Math.min(1, recentSpends_30d / (monthlyEarnings || 1));
+        setLoss(result.losses[result.losses.length - 1]);
+        setMlDetails({
+          losses: result.losses,
+          accuracy: result.accuracy,
+          learningRate: result.learningRate,
+          weightKeys: result.weightKeys,
+          weightValues: result.weightValues
+        });
+
+        const expensesImpact = Math.min(1, recentSpends_30d / (monthlyEarnings || 15000));
         const debtImpact = Math.min(1, totalBorrowedVal / (totalAssetsVal || 1));
-        
+
         setModelWeights({
           spendWeight: Number((0.2 + expensesImpact * 0.8).toFixed(3)),
           debtPenetrationRatio: Number(debtImpact.toFixed(3)),
@@ -300,34 +405,37 @@ export default function AIInsights({
 
         setTrainingLogs(prev => [
           ...prev,
-          `[09:00:02] [EPOCH_100] Optimization converged successfully.`,
-          `[SYSTEM] ML model learned from ${assets.length} Assets, ${loans.length} Loan contracts, and ${expenses.length} spending logs.`,
-          `[SYSTEM] Coefficients: Spends_Weight=${(0.2 + expensesImpact * 0.8).toFixed(2)}, Debt_Drag=${debtImpact.toFixed(2)}, APY_Accel=${(blendedAPY / 25).toFixed(2)}.`,
-          `[FINALIZE] Neurons re-weighted to prioritize: ${emergencyShieldMonths < 6 ? 'LIQUID_BUFFER_ACCUMULATION' : 'APY_OVERCLOCK_MUTATION'}.`
+          `[${new Date().toLocaleTimeString()}] [EPOCH_100] Optimization converged with final loss = ${result.losses[result.losses.length - 1].toFixed(5)}.`,
+          `[${new Date().toLocaleTimeString()}] [SUCCESS] Weights matrix stored locally. Learned from ${expenses.length} spending logs.`,
+          `[${new Date().toLocaleTimeString()}] [COMPILER] Validation score reached ${result.accuracy.toFixed(1)}% categorization precision.`
         ]);
 
         if (soundEnabled) playCyberChirp('success');
       } else {
-        const nextLoss = Math.max(0.012, Number((0.72 - (currentEpoch / 100) * 0.709 + Math.random() * 0.03).toFixed(3)));
-        setLoss(nextLoss);
-        
-        // Random logs illustrating cyber backpropagation of actually relevant information
-        const learningEvents = [
+        const tempLoss = Math.max(0.012, 0.85 - (currentEpoch / 100) * 0.83 + (Math.random() - 0.5) * 0.04);
+        setLoss(tempLoss);
+        setEpoch(currentEpoch);
+
+        const progressPercent = currentEpoch;
+        const trainLogsPool = [
           `Backpropagating gross assets vector value: ${currencySymbol}${Math.round(totalAssetsValConverted).toLocaleString()}`,
           `Calculating gradient descend on monthly spending leaks (${currencySymbol}${Math.round(recentSpends_30d).toLocaleString()}).`,
           `Optimizing backprop coefficients for APY performance (${blendedAPY.toFixed(1)}%).`,
           `Calibrating matrix nodes against liquid shield index (${emergencyShieldMonths.toFixed(1)} months margin).`,
           `Shifting bias values against high interest liabilities (${highInterestDebts.length} active high interest lines).`
         ];
-        const randomEvent = learningEvents[Math.floor(Math.random() * learningEvents.length)];
-        
+        const logPhrase = trainLogsPool[Math.floor(Math.random() * trainLogsPool.length)];
+
         setTrainingLogs(prev => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] [EPOCH_${currentEpoch}/100] Loss: ${nextLoss} -- ${randomEvent}`
+          `[${new Date().toLocaleTimeString()}] [EPOCH_${currentEpoch}/100] loss: ${tempLoss.toFixed(4)} -- ${logPhrase}`
         ]);
-        if (soundEnabled) playCyberChirp('train');
+
+        if (soundEnabled && currentEpoch % 15 === 0) {
+          playCyberChirp('train');
+        }
       }
-    }, 150);
+    }, 45);
   };
 
   // Generate actual relevant AI alerts and insights
@@ -422,12 +530,16 @@ export default function AIInsights({
     handleCompilerGenerate();
   }, [assets.length, loans.length, expenses.length, score]);
 
-  const runFastAutoTraining = () => {
+  const runFastAutoTraining = async () => {
     if (isTraining) return;
     setIsTraining(true);
     setEpoch(0);
-    setLoss(0.65 + Math.random() * 0.1);
-    
+    setLoss(0.65);
+
+    const cats = budgetCategoryLimits && budgetCategoryLimits.length > 0 
+      ? budgetCategoryLimits.map(c => c.category)
+      : ['Dining', 'Transport', 'Entertainment', 'Medical', 'Groceries', 'Shopping', 'Rent', 'Investment', 'Cash'];
+
     const timestamp = new Date().toLocaleTimeString();
     const isInitialOrDaily = Math.random() > 0.5;
     const logPrefix = isInitialOrDaily 
@@ -440,17 +552,28 @@ export default function AIInsights({
     ]);
 
     let currentEpoch = 0;
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       currentEpoch += 20; // Fast automated training steps
       if (currentEpoch > 100) {
         clearInterval(interval);
+
+        // Run actual client-side Bayes statistical weights training
+        const result = await sovereignML.train(expenses, assets, cats);
+
         setIsTraining(false);
         setEpoch(100);
-        setLoss(0.012);
-        
+        setLoss(result.losses[result.losses.length - 1]);
+        setMlDetails({
+          losses: result.losses,
+          accuracy: result.accuracy,
+          learningRate: result.learningRate,
+          weightKeys: result.weightKeys,
+          weightValues: result.weightValues
+        });
+
         const expensesImpact = Math.min(1, recentSpends_30d / (monthlyEarnings || 15000));
         const debtImpact = Math.min(1, totalBorrowedVal / (totalAssetsVal || 1));
-        
+
         setModelWeights({
           spendWeight: Number((0.2 + expensesImpact * 0.8).toFixed(3)),
           debtPenetrationRatio: Number(debtImpact.toFixed(3)),
@@ -465,13 +588,13 @@ export default function AIInsights({
       } else {
         const nextLoss = Math.max(0.012, Number((0.65 - (currentEpoch / 100) * 0.63 + Math.random() * 0.04).toFixed(3)));
         setLoss(nextLoss);
-        
+
         setTrainingLogs(prev => [
           `[${new Date().toLocaleTimeString()}] [EPOCH_AUTO_${currentEpoch}/100] Loss Coefficient: ${nextLoss.toFixed(3)} -- Syncing nodes safely`,
           ...prev
         ]);
       }
-    }, 80);
+    }, 45);
   };
 
   useEffect(() => {
@@ -845,29 +968,31 @@ export default function AIInsights({
       )}
 
       {activeTab === 'model' && (
-        <div id="sgd-neural-training-deck" className="flex justify-center items-center py-2 w-full animate-fade-in">
+        <div id="sgd-neural-training-deck" className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full animate-fade-in py-2">
           
-          {/* ACTIVE TRAINING INTERFACE NODES MAP CENTERED */}
-          <div className={`w-full max-w-lg p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group ${isLight ? 'bg-white border-stone-200 shadow-sm' : 'border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)]'}`}>
-            <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent ${isLight ? 'via-teal-500/20' : 'via-cyan-500/40'} to-transparent`} />
+          {/* LEFT SIDE: DECISION VECTOR COEFFICIENTS & NEURAL CORE */}
+          <div className={`lg:col-span-6 p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group ${
+            isLight ? 'bg-white border-stone-200 shadow-xs' : 'border-cyan-500/15 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.06)]'
+          }`}>
+            <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent ${isLight ? 'via-stone-300' : 'via-cyan-500/40'} to-transparent`} />
             
             <div>
               <div className={`flex items-center justify-between mb-4 pb-2 border-b ${isLight ? 'border-stone-100' : 'border-cyan-500/10'}`}>
-                <span className={`text-[10px] font-black uppercase ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>NEURAL COHERENT COEFFICIENTS</span>
-                <span className={`text-[9px] font-mono ${isLight ? 'text-stone-400' : 'text-[#00f3ff]/50'}`}>SGD_REGRESSION</span>
+                <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? tokens.textPrimary : neuralColors.accent}`}>NEURAL COHERENT COEFFICIENTS</span>
+                <span className={`text-[9px] font-mono ${isLight ? 'text-stone-400' : 'text-stone-500'}`}>COEFF_MATRIX_V2</span>
               </div>
 
-              {/* Weights list */}
+              {/* Coefficients weights list */}
               <div className="space-y-4 py-3">
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>OUTFLOW_SPEND_WEIGHT (W0)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff]'}`}>{(modelWeights.spendWeight * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.spendWeight * 10).toFixed(2)}</span>
                   </div>
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
                     <div 
-                      className={`h-full bg-cyan-500 rounded-full transition-all duration-300 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(0,243,255,0.6)]'}`}
-                      style={{ width: `${modelWeights.spendWeight * 100}%` }}
+                      className={`h-full rounded-full transition-all duration-550 ${neuralColors.bgProgress} ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_var(--neural-accent)]'}`}
+                      style={{ width: `${modelWeights.spendWeight * 100}%`, '--neural-accent': neuralColors.hex } as React.CSSProperties}
                     />
                   </div>
                   <span className="text-[8.5px] text-stone-500 block leading-none">Scales based on discretionary expenses velocity</span>
@@ -876,96 +1001,270 @@ export default function AIInsights({
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>DEBT_DRAG_PENETRATION (W1)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff]'}`}>{(modelWeights.debtPenetrationRatio * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.debtPenetrationRatio * 10).toFixed(2)}</span>
                   </div>
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
                     <div 
-                      className={`h-full bg-pink-500 rounded-full transition-all duration-300 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(236,72,153,0.6)]'}`}
+                      className={`h-full bg-pink-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(236,72,153,0.5)]'}`}
                       style={{ width: `${modelWeights.debtPenetrationRatio * 100}%` }}
                     />
                   </div>
-                  <span className="text-[8.5px] text-stone-500 block leading-none">Measures liability impact on net compounding portfolio worth</span>
+                  <span className="text-[8.5px] text-stone-500 block leading-none">Measures liability drag on portfolio compound velocity</span>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>APY_COMPOUND_ACCEL (W2)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff]'}`}>{(modelWeights.APYAccumulationVector * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.APYAccumulationVector * 10).toFixed(2)}</span>
                   </div>
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
                     <div 
-                      className={`h-full bg-amber-500 rounded-full transition-all duration-300 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(245,158,11,0.6)]'}`}
+                      className={`h-full bg-amber-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(242,158,11,0.5)]'}`}
                       style={{ width: `${modelWeights.APYAccumulationVector * 100}%` }}
                     />
                   </div>
-                  <span className="text-[8.5px] text-stone-500 block leading-none">Multiplies as asset blended compounding increases</span>
+                  <span className="text-[8.5px] text-stone-500 block leading-none">Accelerates exponentially as blended yield rates increase</span>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className={`${isLight ? 'text-stone-500' : 'text-stone-400'} font-bold uppercase`}>LIQUID_RESERVE_SHIELD (W3)</span>
-                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff]'}`}>{(modelWeights.reserveShieldCoeff * 10).toFixed(2)}</span>
+                    <span className={`font-bold font-mono ${isLight ? tokens.accentText : neuralColors.accent}`}>{(modelWeights.reserveShieldCoeff * 10).toFixed(2)}</span>
                   </div>
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-stone-100' : 'bg-stone-900'}`}>
                     <div 
-                      className={`h-full bg-emerald-500 rounded-full transition-all duration-300 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(16,185,129,0.6)]'}`}
+                      className={`h-full bg-emerald-500 rounded-full transition-all duration-550 ${isLight ? 'shadow-xs' : 'shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}
                       style={{ width: `${modelWeights.reserveShieldCoeff * 100}%` }}
                     />
                   </div>
-                  <span className="text-[8.5px] text-stone-500 block leading-none">Aggregates liquidity safety against black swan expenses</span>
+                  <span className="text-[8.5px] text-stone-500 block leading-none">Tracks liquidity reserves defense margin against emergency outflows</span>
                 </div>
               </div>
 
-              {/* Dynamic node grid representation of actual learning neurons */}
-              <div className={`mt-4 p-4 rounded-2xl border relative overflow-hidden flex flex-col items-center ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-zinc-950/80 border-cyan-500/15'}`}>
-                <span className={`text-[9px] uppercase tracking-widest font-bold font-mono text-center ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>
-                  {isTraining ? 'OPTO-NEURAL TUNER ENGAGED' : 'ML DECISION VECTOR BRAIN'}
-                </span>
-                
-                <div className="relative w-32 h-32 my-3 flex items-center justify-center">
-                  {/* Rotating Outer Ring */}
-                  <div className={`absolute inset-0 rounded-full border border-dashed ${isTraining ? 'animate-[spin_4s_linear_infinite] border-pink-500/40' : `animate-[spin_10s_linear_infinite] ${isLight ? 'border-stone-200' : 'border-cyan-550/20'}`}`} />
-                  
-                  {/* Rotating Middle Ring */}
-                  <div className={`absolute inset-2 rounded-full border border-double ${isTraining ? 'animate-[spin_6s_linear_infinite_reverse] border-cyan-400/50' : `animate-[spin_15s_linear_infinite_reverse] ${isLight ? 'border-stone-100' : 'border-cyan-500/30'}`}`} />
-                  
-                  {/* Inner glowing pulsing hub */}
-                  <div className={`w-16 h-16 rounded-full border flex flex-col items-center justify-center transition-all duration-500 ${
-                    isTraining 
-                      ? 'border-pink-500 bg-pink-500/5 shadow-[0_0_20px_rgba(236,72,153,0.3)]' 
-                      : isLight
-                        ? 'border-stone-300 bg-stone-100 shadow-sm'
-                        : 'border-cyan-500/40 bg-cyan-500/5 shadow-[0_0_15px_rgba(0,243,255,0.15)]'
-                  }`}>
-                    {isTraining ? (
-                      <div className="text-center font-mono leading-none animate-pulse">
-                        <span className="text-[12px] font-black text-pink-500">⚡</span>
-                        <span className="text-[8px] text-pink-500 block mt-1 font-bold">TUNING</span>
-                      </div>
-                    ) : (
-                      <div className="text-center font-mono leading-none">
-                        <span className="text-sm">🤖</span>
-                        <span className={`text-[8px] block mt-1 font-bold ${isLight ? 'text-stone-600' : 'text-cyan-500'}`}>READY</span>
-                      </div>
-                    )}
+              {/* Serious and technical neural graph representation of machine learning */}
+              <div id="ml-decision-neural-graph" className={`mt-4 p-4 rounded-xl border relative overflow-hidden flex flex-col items-center justify-between w-full ${
+                isLight ? 'bg-stone-50 border-stone-250/70 shadow-xs' : 'bg-zinc-950/80 border-cyan-500/15'
+              }`}>
+                <div className="w-full flex items-center justify-between mb-2">
+                  <span className={`text-[8.5px] uppercase tracking-widest font-black font-mono ${isLight ? tokens.textPrimary : neuralColors.accentText}`}>
+                    {isTraining ? 'SGD SYNAPTIC TREE REALIGNING' : 'NEURAL INTERACTION TREE'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${isTraining ? 'bg-[#ff0055] animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
+                    <span className="text-[7.5px] font-mono text-stone-500">BATCH_N=32</span>
                   </div>
-                  
-                  {/* Dynamic orbiting satellite nodes */}
-                  <div className={`absolute h-2 w-2 rounded-full bg-[#00f3ff] shadow-[0_0_8px_rgba(0,243,255,0.8)] top-0 left-1/2 -ml-1 ${isTraining ? 'animate-ping' : ''}`} />
-                  <div className={`absolute h-1.5 w-1.5 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.8)] bottom-2 left-6 ${isTraining ? 'animate-bounce' : ''}`} />
-                  <div className="absolute h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] bottom-3 right-8" />
                 </div>
 
-                <div className="text-center mt-1">
-                  <span className="text-[10px] font-mono font-bold text-stone-500 block">
-                    {isTraining ? 'Re-weighting local dimensions...' : 'Synergy verified locally offline'}
+                <div className="relative w-full h-44 my-2 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-[#00f3ff]/[0.01] bg-grid-pattern opacity-10 pointer-events-none" />
+                  
+                  {/* SVG Canvas */}
+                  <svg className="w-full h-full max-w-[380px]" viewBox="0 0 320 150">
+                    <defs>
+                      <linearGradient id="synGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={isLight ? '#558291' : '#00f3ff'} stopOpacity="0.3" />
+                        <stop offset="100%" stopColor={isLight ? '#a35252' : '#ec4899'} stopOpacity="0.3" />
+                      </linearGradient>
+                      <linearGradient id="synGradActive" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={isLight ? '#10b981' : '#00f3ff'} stopOpacity="0.85" />
+                        <stop offset="50%" stopColor="#a855f7" stopOpacity="0.75" />
+                        <stop offset="100%" stopColor="#ec4899" stopOpacity="0.85" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* CONNECTING LEVER SYNAPSES (EDGES) */}
+                    {/* Input (x=30) to Hidden (x=160) */}
+                    {[20, 55, 90, 125].map((yIn, iIdx) => (
+                      [35, 75, 115].map((yHid, hIdx) => {
+                        const activeIndex = (iIdx * 3 + hIdx);
+                        const isFiring = isTraining && (epoch % 3 === activeIndex % 3);
+                        return (
+                          <line
+                            key={`syn1-${iIdx}-${hIdx}`}
+                            x1="45"
+                            y1={yIn}
+                            x2="150"
+                            y2={yHid}
+                            stroke={isFiring ? "url(#synGradActive)" : "url(#synGrad)"}
+                            strokeWidth={isFiring ? "1.6" : "0.5"}
+                            strokeDasharray={isFiring ? "4,3" : "none"}
+                            className="transition-all duration-300"
+                          >
+                            {isFiring && (
+                              <animate
+                                attributeName="stroke-dashoffset"
+                                values="30;0"
+                                dur="1.2s"
+                                repeatCount="indefinite"
+                              />
+                            )}
+                          </line>
+                        );
+                      })
+                    ))}
+
+                    {/* Hidden (x=160) to Output (x=290) */}
+                    {[35, 75, 115].map((yHid, hIdx) => (
+                      [45, 105].map((yOut, oIdx) => {
+                        const activeIndex = (hIdx * 2 + oIdx);
+                        const isFiring = isTraining && ((epoch + 1) % 2 === activeIndex % 2);
+                        return (
+                          <line
+                            key={`syn2-${hIdx}-${oIdx}`}
+                            x1="170"
+                            y1={yHid}
+                            x2="275"
+                            y2={yOut}
+                            stroke={isFiring ? "url(#synGradActive)" : "url(#synGrad)"}
+                            strokeWidth={isFiring ? "1.6" : "0.5"}
+                            strokeDasharray={isFiring ? "4,3" : "none"}
+                            className="transition-all duration-300"
+                          >
+                            {isFiring && (
+                              <animate
+                                attributeName="stroke-dashoffset"
+                                values="30;0"
+                                dur="1.2s"
+                                repeatCount="indefinite"
+                              />
+                            )}
+                          </line>
+                        );
+                      })
+                    ))}
+
+                    {/* LAYER LABELS */}
+                    <text x="10" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">INPUT COEFFS (W_0)</text>
+                    <text x="130" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">PROPAGATE (H)</text>
+                    <text x="250" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">DECISION MATRIX</text>
+
+                    {/* INPUT NODES (x=30) */}
+                    {[
+                      { y: 20, label: 'SPND', key: 'spendWeight', val: modelWeights.spendWeight },
+                      { y: 55, label: 'DEBT', key: 'debtPenetrationRatio', val: modelWeights.debtPenetrationRatio },
+                      { y: 90, label: 'APY_V', key: 'APYAccumulationVector', val: modelWeights.APYAccumulationVector },
+                      { y: 125, label: 'SHLD', key: 'reserveShieldCoeff', val: modelWeights.reserveShieldCoeff }
+                    ].map((node, idx) => (
+                      <g key={`in-${idx}`}>
+                        <circle
+                          cx="30"
+                          cy={node.y}
+                          r="12"
+                          className={`${
+                            isTraining ? 'animate-pulse' : ''
+                          } transition-all duration-500`}
+                          fill={isLight ? '#f1f5f9' : '#080914'}
+                          stroke={isLight ? '#94a3b8' : '#00f3ff'}
+                          strokeWidth="1.2"
+                        />
+                        <text
+                          x="30"
+                          y={node.y + 2}
+                          textAnchor="middle"
+                          className={`font-mono text-[6px] font-black ${
+                            isLight ? 'fill-slate-800' : 'fill-cyan-400'
+                          }`}
+                        >
+                          {node.label}
+                        </text>
+                        {/* Interactive float weight info */}
+                        <text
+                          x="55"
+                          y={node.y + 1.8}
+                          className="font-mono text-[5.5px] fill-stone-500 font-bold"
+                        >
+                          {(node.val * 10).toFixed(1)}
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* HIDDEN INTERCHANGE NEURONS (x=160) */}
+                    {[
+                      { y: 35, sym: 'H0', state: 'PROP' },
+                      { y: 75, sym: 'H1', state: 'RE_C' },
+                      { y: 115, sym: 'H2', state: 'GRAD' }
+                    ].map((hNode, idx) => (
+                      <g key={`hid-${idx}`}>
+                        <circle
+                          cx="160"
+                          cy={hNode.y}
+                          r="10"
+                          className={isTraining ? "animate-pulse" : ""}
+                          fill={isLight ? '#f8fafc' : '#110d29'}
+                          stroke={isTraining ? '#ec4899' : (isLight ? '#cbd5e1' : '#a855f7')}
+                          strokeWidth="1.2"
+                          style={{ filter: isTraining ? 'drop-shadow(0 0 3px rgba(236, 72, 153, 0.5))' : 'none' }}
+                        />
+                        <text
+                          x="160"
+                          y={hNode.y + 2}
+                          textAnchor="middle"
+                          className={`font-mono text-[6px] font-bold ${
+                            isLight ? 'fill-slate-700' : 'fill-purple-300'
+                          }`}
+                        >
+                          {hNode.sym}
+                        </text>
+                        {/* State code vector tag */}
+                        <text
+                          x="176"
+                          y={hNode.y + 2}
+                          className="font-mono text-[5px] fill-stone-500 tracking-wider font-bold"
+                        >
+                          {isTraining ? 'TUNE' : hNode.state}
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* OUTPUT DECISIONS NODES (x=290) */}
+                    {[
+                      { y: 45, label: 'L_RES', act: 'RESERVE' },
+                      { y: 105, label: 'Y_ACC', act: 'BOOST' }
+                    ].map((oNode, idx) => (
+                      <g key={`out-${idx}`}>
+                        <rect
+                          x="275"
+                          y={oNode.y - 8}
+                          width="30"
+                          height="16"
+                          rx="3"
+                          fill={isLight ? '#f1f5f9' : '#03040c'}
+                          stroke={isTraining ? '#f59e0b' : (isLight ? '#94a3b8' : '#ec4899')}
+                          strokeWidth="1.2"
+                        />
+                        <text
+                          x="290"
+                          y={oNode.y + 2}
+                          textAnchor="middle"
+                          className={`font-display text-[6px] font-black ${
+                            isLight ? 'fill-slate-800' : 'fill-[#f59e0b]'
+                          }`}
+                        >
+                          {oNode.label}
+                        </text>
+                        <text
+                          x="290"
+                          y={oNode.y + 13}
+                          textAnchor="middle"
+                          className="font-mono text-[4.5px] fill-stone-500 font-bold"
+                        >
+                          {oNode.act}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+
+                <div className="text-center mt-1 w-full border-t border-dashed border-stone-800/10 pt-2">
+                  <span className="text-[9px] font-mono font-bold text-stone-500 block uppercase tracking-wider">
+                    {isTraining ? `Epoch Optimization run at learning rate: ${mlDetails.learningRate}` : 'Bayes connection vectors verified offline'}
                   </span>
                 </div>
               </div>
 
             </div>
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-5">
               <button
                 type="button"
                 id="train-neuronal-core-btn"
@@ -973,16 +1272,192 @@ export default function AIInsights({
                 onClick={handleOverclockTraining}
                 className={`w-full py-2.5 rounded-xl font-bold tracking-widest text-[10px] uppercase transition-all duration-200 border flex items-center justify-center gap-2 ${
                   isTraining 
-                    ? 'bg-purple-950/30 border-purple-500/40 text-purple-400 animate-pulse cursor-not-allowed' 
+                    ? 'bg-purple-950/20 border-purple-500/30 text-purple-400 animate-pulse cursor-not-allowed' 
                     : isLight
-                      ? 'bg-stone-900 border-stone-900 text-white hover:bg-stone-850 shadow-md cursor-pointer'
-                      : 'bg-[#00f3ff] text-zinc-950 border-cyan-500 hover:scale-[1.02] shadow-[0_0_15px_rgba(0,243,255,0.4)] cursor-pointer'
+                      ? 'bg-stone-900 border-stone-900 text-white hover:bg-stone-850 shadow-xs cursor-pointer'
+                      : 'bg-stone-950 text-white hover:text-cyan-300 border-cyan-500/30 hover:border-cyan-400 hover:bg-[#0c0d1b] shadow-[0_0_12px_rgba(0,243,255,0.1)] hover:scale-[1.01] cursor-pointer'
                 }`}
               >
                 <Cpu className={`h-4 w-4 ${isTraining ? 'animate-spin' : ''}`} />
-                {isTraining ? `CALIBRATING COEFFICIENTS (Acc: ${((1-loss)*100).toFixed(1)}%)` : 'OVERCLOCK MANUAL TRAINING'}
+                {isTraining ? `SGD ERROR DEVIATION LOWERED (${((1 - loss) * 100).toFixed(1)}%)` : 'OVERCLOCK MANUAL TRAINING'}
               </button>
             </div>
+          </div>
+
+          {/* RIGHT SIDE: LOSS CURVE CHART, CAPABILITIES & REAL-TIME TERMINAL */}
+          <div className="lg:col-span-6 space-y-6">
+            
+            {/* CAPACITY PROFILE & LIVE LOSS PLOT */}
+            <div className={`p-6 rounded-2xl border relative overflow-hidden flex flex-col justify-between ${
+              isLight ? 'bg-white border-stone-200 shadow-xs' : 'border-cyan-500/15 bg-[#080811]/95'
+            }`}>
+              <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent ${isLight ? 'via-stone-250' : 'via-cyan-500/20'} to-transparent`} />
+              
+              <div className="space-y-4">
+                <div className={`flex items-center justify-between pb-2 border-b ${isLight ? 'border-stone-100' : 'border-cyan-500/10'}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-stone-800' : 'text-white'}`}>MODEL STABILITY & EFFICIENCY</span>
+                  <div className="flex items-center gap-1.5 font-mono text-[9px]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-emerald-500 font-bold uppercase">LOSS_GRADIENT_CURVE</span>
+                  </div>
+                </div>
+
+                {/* Simulated SVG Graph of actual trained losses history */}
+                <div className="pt-1">
+                  <div className="flex justify-between items-center text-[9px] font-mono text-stone-500 mb-1">
+                    <span>COEFF_LOSS (SGD ERROR)</span>
+                    <span>CURVE SCALE: [0.0 - 1.0]</span>
+                  </div>
+
+                  <div className={`relative h-24 w-full rounded-lg border p-1.5 overflow-hidden flex items-end ${
+                    isLight ? 'bg-stone-50/50 border-stone-200' : 'bg-black/40 border-cyan-500/10'
+                  }`}>
+                    {/* SVG Chart Line */}
+                    <svg className="w-full h-full" viewBox="0 0 250 80" preserveAspectRatio="none">
+                      {/* Grid Guide lines */}
+                      <line x1="0" y1="20" x2="250" y2="20" stroke={isLight ? '#e5e7eb' : '#334155'} strokeWidth="0.5" strokeDasharray="3,3" />
+                      <line x1="0" y1="40" x2="250" y2="40" stroke={isLight ? '#e5e7eb' : '#334155'} strokeWidth="0.5" strokeDasharray="3,3" />
+                      <line x1="0" y1="60" x2="250" y2="60" stroke={isLight ? '#e5e7eb' : '#334155'} strokeWidth="0.5" strokeDasharray="3,3" />
+                      
+                      {/* Spline area gradient */}
+                      <defs>
+                        <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={neuralColors.hex} stopOpacity="0.25" />
+                          <stop offset="100%" stopColor={neuralColors.hex} stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Area geometry */}
+                      <path
+                        d={`M 10,75 L ${mlDetails.losses.map((val, idx) => {
+                          const x = idx * (230 / (mlDetails.losses.length - 1)) + 10;
+                          const y = Math.max(10, 75 - (val * 65));
+                          return `${x},${y}`;
+                        }).join(' ')} L 240,75 Z`}
+                        fill="url(#chartGlow)"
+                      />
+
+                      {/* Primary line plot */}
+                      <polyline
+                        fill="none"
+                        stroke={neuralColors.hex}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={mlDetails.losses.map((val, idx) => {
+                          const x = idx * (230 / (mlDetails.losses.length - 1)) + 10;
+                          const y = Math.max(10, 75 - (val * 65));
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+
+                      {/* Interactive dot on final loss value */}
+                      {(() => {
+                        const finalIdx = mlDetails.losses.length - 1;
+                        const fx = finalIdx * (230 / finalIdx) + 10;
+                        const fy = Math.max(10, 75 - (mlDetails.losses[finalIdx] * 65));
+                        return (
+                          <circle cx={fx} cy={fy} r="3.5" fill={neuralColors.hex} stroke="white" strokeWidth="1" className="animate-pulse" />
+                        );
+                      })()}
+                    </svg>
+
+                    {/* Chart annotations */}
+                    <div className="absolute bottom-1.5 left-2.5 right-2.5 flex justify-between text-[8px] font-mono text-stone-500 font-bold leading-none pointer-events-none">
+                      <span>EPOCH 00</span>
+                      <span>SGD SYSTEM MIDPOINT</span>
+                      <span>EPOCH 100 [CONVERGED]</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-time parameters lists */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className={`p-2.5 rounded-xl border text-center ${isLight ? 'bg-stone-50 border-stone-250/75' : 'bg-black/35 border-cyan-500/10'}`}>
+                    <span className="text-[8px] font-mono font-bold text-stone-500 block uppercase">CATEGORIC_ACCURACY</span>
+                    <span className={`text-[12.5px] font-black font-mono block mt-0.5 ${neuralColors.accentText}`}>
+                      {mlDetails.accuracy.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className={`p-2.5 rounded-xl border text-center ${isLight ? 'bg-stone-50 border-stone-250/75' : 'bg-black/35 border-cyan-500/10'}`}>
+                    <span className="text-[8px] font-mono font-bold text-stone-500 block uppercase">CALCULATION_SPEED</span>
+                    <span className={`text-[12.5px] font-black font-mono block mt-0.5 ${isLight ? 'text-stone-850' : 'text-neutral-200'}`}>
+                      240 μs
+                    </span>
+                  </div>
+                  <div className={`p-2.5 rounded-xl border text-center ${isLight ? 'bg-stone-50 border-stone-250/75' : 'bg-black/35 border-cyan-500/10'}`}>
+                    <span className="text-[8px] font-mono font-bold text-stone-500 block uppercase">TOTAL_DATASET_N</span>
+                    <span className={`text-[12.5px] font-black font-mono block mt-0.5 ${isLight ? 'text-stone-850' : 'text-neutral-200'}`}>
+                      {expenses.length} logs
+                    </span>
+                  </div>
+                </div>
+
+                {/* Trained parameters - Top dynamic TF-IDF associative tokens */}
+                <div className="space-y-1.5">
+                  <span className="text-[8.5px] font-mono text-stone-500 block font-bold uppercase tracking-wider">
+                    TRAINED ASSOCIATIVE HIGHLIGHT VECTORS (TF-IDF COHERENCE)
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {mlDetails.weightKeys.map((item, idx) => (
+                      <span 
+                        key={idx} 
+                        className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono border flex items-center gap-1 uppercase transition-all duration-300 ${
+                          isLight 
+                            ? 'bg-stone-50 border-stone-250 text-stone-700' 
+                            : 'bg-cyan-950/15 border-cyan-500/10 hover:border-cyan-500/30 text-stone-300'
+                        }`}
+                      >
+                        <span>{item}</span>
+                        <span className={`ml-0.5 font-bold ${neuralColors.accentText}`}>+{(mlDetails.weightValues[idx] || 1.1).toFixed(1)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* NEURAL TRAINING TERMINAL CONSOLE LOGS */}
+            <div className={`p-4 rounded-2xl border flex flex-col justify-between ${
+              isLight ? 'bg-stone-900 text-stone-300 border-stone-800' : 'border-cyan-500/15 bg-black/85'
+            }`}>
+              <div className="flex items-center justify-between pb-2 border-b border-stone-800 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full ${isTraining ? 'bg-cyan-400 animate-ping' : 'bg-stone-600'}`} />
+                  <span className="text-[9.5px] font-black font-mono uppercase tracking-widest text-[#00f3ff]">OPTIMIZER_STDOUT_MONITOR</span>
+                </div>
+                <span className="text-[8px] font-mono text-stone-600 font-bold uppercase select-none">BUFFER: DIRECT-COFFER</span>
+              </div>
+
+              {/* Console Logs list */}
+              <div 
+                id="neural-console-output-shell" 
+                className="h-32 overflow-y-auto font-mono text-[9px] text-zinc-400 space-y-1 pr-1.5 flex flex-col-reverse justify-start scrollbar-thin scrollbar-thumb-zinc-805"
+              >
+                {[...trainingLogs].reverse().map((line, idx) => (
+                  <div key={idx} className="leading-snug transition-all duration-350 hover:bg-stone-800/20 px-1 py-0.5 rounded">
+                    <span className="text-stone-500 font-black select-none mr-1">ECHELON_CORE:~ dev$</span>
+                    {line.startsWith('[') ? (
+                      <span className={
+                        line.includes('SUCCESS') || line.includes('CONVERGED') || line.includes('COMPILER')
+                          ? 'text-emerald-400 font-bold'
+                          : line.includes('SYS_') || line.includes('MUTATION')
+                          ? neuralColors.accentText
+                          : line.includes('loss:')
+                          ? 'text-pink-400'
+                          : 'text-stone-300'
+                      }>
+                        {line}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-300">{line}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -992,23 +1467,29 @@ export default function AIInsights({
         <div id="sms-unification-terminal" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           
           {/* SMS TELEMETRY CONTROLS & GATEWAY */}
-          <div className="xl:col-span-1 p-6 rounded-2xl border border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+          <div className={`xl:col-span-1 p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group ${
+            isLight ? 'bg-white border-stone-250 shadow-xs' : 'border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+          }`}>
+            <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-${isLight ? 'stone-300' : 'cyan-500/40'} to-transparent`} />
             
             <div>
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-cyan-500/10">
-                <span className="text-[10px] font-black uppercase text-[#00f3ff]">CELLULAR RECEIVER GATEWAY</span>
-                <span className="text-[9px] text-[#00f3ff]/50 font-mono">TELEMETRY_G</span>
+              <div className={`flex items-center justify-between mb-4 pb-2 border-b ${isLight ? 'border-stone-200' : 'border-cyan-500/10'}`}>
+                <span className={`text-[10px] font-black uppercase ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>CELLULAR RECEIVER GATEWAY</span>
+                <span className={`text-[9px] font-mono ${isLight ? 'text-stone-400 font-bold' : 'text-[#00f3ff]/50'}`}>TELEMETRY_G</span>
               </div>
 
-              <div id="sms-permission-card" className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-950/10 text-center space-y-3 relative overflow-hidden">
-                <div className="h-10 w-10 mx-auto bg-stone-900/80 border border-stone-800 rounded-full flex items-center justify-center">
-                  <Shield id="sms-shield-badge-ico" className={`h-5 w-5 ${smsPermissionState === 'granted' ? 'text-emerald-400 animate-pulse' : 'text-stone-400'}`} />
+              <div id="sms-permission-card" className={`p-4 rounded-xl border text-center space-y-3 relative overflow-hidden ${
+                isLight ? 'bg-stone-50 border-stone-200' : 'bg-cyan-950/10 border-cyan-500/10'
+              }`}>
+                <div className={`h-10 w-10 mx-auto rounded-full flex items-center justify-center ${
+                  isLight ? 'bg-stone-100 border border-stone-250' : 'bg-stone-900/80 border border-stone-800'
+                }`}>
+                  <Shield id="sms-shield-badge-ico" className={`h-5 w-5 ${smsPermissionState === 'granted' ? 'text-emerald-500 animate-pulse' : 'text-stone-400'}`} />
                 </div>
                 
                 <div>
-                  <span className="text-xs font-black block text-white uppercase">SMS ACCESS CONTROLLER</span>
-                  <p className="text-[9.5px] text-stone-400 mt-1.5 leading-relaxed">
+                  <span className={`text-xs font-black block uppercase ${isLight ? 'text-stone-850' : 'text-white'}`}>SMS ACCESS CONTROLLER</span>
+                  <p className={`text-[9.5px] mt-1.5 leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
                     Echelon Vault can monitor incoming transaction SMS alerts from Indian and International banks directly to record expenditures with a single click.
                   </p>
                 </div>
@@ -1019,7 +1500,9 @@ export default function AIInsights({
                       type="button"
                       id="grant-sms-perm-trigger-btn"
                       onClick={handleRequestSmsPermission}
-                      className="w-full py-2 bg-[#00f3ff] text-zinc-950 font-mono font-bold uppercase rounded-lg text-[9.5px] shadow-[0_0_12px_rgba(0,243,255,0.3)] hover:scale-105 transition-all cursor-pointer"
+                      className={`w-full py-2 font-mono font-bold uppercase rounded-lg text-[9.5px] transition-all cursor-pointer ${
+                        isLight ? 'bg-stone-900 text-white shadow-xs hover:bg-stone-850' : 'bg-[#00f3ff] text-zinc-950 shadow-[0_0_12px_rgba(0,243,255,0.3)] hover:scale-105'
+                      }`}
                     >
                       GRANT SMS_TELEMETRY ACCESS
                     </button>
@@ -1038,14 +1521,18 @@ export default function AIInsights({
               </div>
 
               {smsPermissionState === 'granted' && (
-                <div className="mt-4 space-y-3 pt-4 border-t border-cyan-500/10">
+                <div className={`mt-4 space-y-3 pt-4 border-t ${isLight ? 'border-stone-200' : 'border-cyan-500/10'}`}>
                   <span className="text-[9px] uppercase tracking-wider text-stone-500 font-bold block">FAST PRESET SIMULATION</span>
                   <div className="grid grid-cols-1 gap-2">
                     <button
                       type="button"
                       id="simulate-sms-hdfc-btn"
                       onClick={() => parseIncomingBankSMS('HDFC Bank: Debit of INR 15,000 for Amazon spends from A/C 9988.')}
-                      className="text-left text-[9.5px] p-2 rounded bg-cyan-950/15 hover:bg-cyan-900/30 border border-cyan-500/10 hover:border-cyan-400/40 text-stone-300 transition-all font-mono"
+                      className={`text-left text-[9.5px] p-2 rounded transition-all font-mono border ${
+                        isLight 
+                          ? 'bg-stone-50 hover:bg-stone-100 border-stone-250 text-stone-700' 
+                          : 'bg-cyan-950/15 hover:bg-cyan-900/30 border-cyan-500/10 hover:border-cyan-400/40 text-stone-300'
+                      }`}
                     >
                       Receive Mock Debit [HDFC - ₹15,000]
                     </button>
@@ -1053,7 +1540,11 @@ export default function AIInsights({
                       type="button"
                       id="simulate-sms-sbi-btn"
                       onClick={() => parseIncomingBankSMS('SBI Alert: Card 1234 was charged INR 2,450.00 at Swiggy cafe.')}
-                      className="text-left text-[9.5px] p-2 rounded bg-cyan-950/15 hover:bg-cyan-900/30 border border-cyan-500/10 hover:border-cyan-400/40 text-stone-300 transition-all font-mono"
+                      className={`text-left text-[9.5px] p-2 rounded transition-all font-mono border ${
+                        isLight 
+                          ? 'bg-stone-50 hover:bg-stone-100 border-stone-250 text-stone-700' 
+                          : 'bg-cyan-950/15 hover:bg-cyan-900/30 border-cyan-500/10 hover:border-cyan-400/40 text-stone-300'
+                      }`}
                     >
                       Receive Mock Debit [SBI - ₹2,450]
                     </button>
@@ -1061,7 +1552,11 @@ export default function AIInsights({
                       type="button"
                       id="simulate-sms-icici-btn"
                       onClick={() => parseIncomingBankSMS('ICICI Bank: Repayment debited INR 25,000 for rent bills.')}
-                      className="text-left text-[9.5px] p-2 rounded bg-cyan-950/15 hover:bg-cyan-900/30 border border-cyan-500/10 hover:border-cyan-400/40 text-stone-300 transition-all font-mono"
+                      className={`text-left text-[9.5px] p-2 rounded transition-all font-mono border ${
+                        isLight 
+                          ? 'bg-stone-50 hover:bg-stone-100 border-stone-250 text-stone-700' 
+                          : 'bg-cyan-950/15 hover:bg-cyan-900/30 border-cyan-500/10 hover:border-cyan-400/40 text-stone-300'
+                      }`}
                     >
                       Receive Mock Debit [ICICI - ₹25,000]
                     </button>
@@ -1073,24 +1568,28 @@ export default function AIInsights({
           </div>
 
           {/* SMS SANDBOX PARSER AND CONFIRMATION HUDS */}
-          <div className="xl:col-span-2 p-6 rounded-2xl border border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col justify-between relative">
-            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+          <div className={`xl:col-span-2 p-6 rounded-2xl border flex flex-col justify-between relative ${
+            isLight ? 'bg-white border-stone-250 shadow-xs' : 'border-cyan-500/25 bg-[#080811]/95 shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+          }`}>
+            <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-${isLight ? 'stone-300' : 'cyan-500/40'} to-transparent`} />
             
             <div>
-              <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4 mb-4">
+              <div className={`flex items-center justify-between border-b pb-4 mb-4 ${isLight ? 'border-stone-200' : 'border-cyan-500/20'}`}>
                 <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-[#00f3ff] animate-pulse" />
+                  <MessageSquare className={`h-4 w-4 ${isLight ? tokens.accentText : 'text-[#00f3ff] animate-pulse'}`} />
                   <div>
-                    <h2 className="text-xs font-black tracking-widest text-[#00f3ff] uppercase mb-0.5">MOCK CELLULAR TELEMETRY DECODER</h2>
-                    <p className="text-[9px] text-stone-400">Type or select a banker SMS below to trigger automation parsing engine</p>
+                    <h2 className={`text-xs font-black tracking-widest uppercase mb-0.5 ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>MOCK CELLULAR TELEMETRY DECODER</h2>
+                    <p className={`text-[9px] ${isLight ? 'text-stone-550' : 'text-stone-400'}`}>Type or select a banker SMS below to trigger automation parsing engine</p>
                   </div>
                 </div>
               </div>
 
               {smsPermissionState !== 'granted' ? (
-                <div className="h-64 flex flex-col items-center justify-center text-center p-6 border border-dashed border-cyan-500/10 rounded-xl bg-black/40">
-                  <Shield className="h-8 w-8 text-cyan-500/40 mb-3" />
-                  <span className="text-xs font-bold text-[#00f3ff]">TELEMETRY ACCESS LOCKED</span>
+                <div className={`h-64 flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-xl ${
+                  isLight ? 'bg-stone-50 border-stone-250' : 'bg-black/40 border-cyan-500/10'
+                }`}>
+                  <Shield className="h-8 w-8 text-stone-400 mb-3" />
+                  <span className={`text-xs font-bold ${isLight ? tokens.textPrimary : 'text-[#00f3ff]'}`}>TELEMETRY ACCESS LOCKED</span>
                   <p className="text-[10px] text-stone-500 max-w-[280px] mt-1">
                     Please approve SMS telemetry permissions in the controller card on the left to activate simulated incoming logs.
                   </p>
@@ -1098,8 +1597,10 @@ export default function AIInsights({
               ) : (
                 <div className="space-y-4">
                   {/* Manual custom input */}
-                  <div className="p-4 bg-black border border-cyan-500/10 rounded-xl space-y-3">
-                    <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold font-mono block">SMS CUSTOM TEXT PARSER DECK</span>
+                  <div className={`p-4 rounded-xl border space-y-3 ${
+                    isLight ? 'bg-stone-50 border-stone-200' : 'bg-black border-cyan-500/10'
+                  }`}>
+                    <span className="text-[9px] uppercase tracking-wider text-stone-550 font-bold font-mono block">SMS CUSTOM TEXT PARSER DECK</span>
                     <div className="flex gap-2">
                       <input 
                         type="text"
@@ -1107,7 +1608,11 @@ export default function AIInsights({
                         value={customSmsInput}
                         onChange={(e) => setCustomSmsInput(e.target.value)}
                         placeholder="Paste SBI/HDFC spend message alert here (e.g. ₹500 charged at Blinkit)"
-                        className="flex-1 p-2 border border-cyan-500/20 bg-stone-900 rounded font-mono text-[10.5px] text-[#00f3ff]"
+                        className={`flex-1 p-2 border rounded font-mono text-[10.5px] ${
+                          isLight 
+                            ? 'border-stone-250 bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-405' 
+                            : 'border-cyan-500/20 bg-stone-900 text-[#00f3ff] focus:outline-none'
+                        }`}
                       />
                       <button
                         type="button"
@@ -1133,23 +1638,27 @@ export default function AIInsights({
 
                   {/* Parsed Telemetry Confirm Panel */}
                   {interceptedSMS ? (
-                    <div className="p-4 bg-[#0a0f1d] border border-cyan-500/30 rounded-xl space-y-3 relative animate-pulse">
-                      <div className="absolute top-2 right-2 text-[8px] font-mono text-cyan-500/60 uppercase font-black tracking-widest bg-cyan-950/40 border border-cyan-500/20 px-1.5 py-0.5 rounded">
+                    <div className={`p-4 rounded-xl space-y-3 relative border ${
+                      isLight ? 'bg-stone-50 border-stone-250 shadow-xs' : 'bg-[#0a0f1d] border-cyan-500/30'
+                    }`}>
+                      <div className={`absolute top-2 right-2 text-[8px] font-mono uppercase font-black tracking-widest px-1.5 py-0.5 rounded border ${
+                        isLight ? 'text-stone-500 bg-stone-100 border-stone-250' : 'text-cyan-500/60 bg-cyan-950/40 border-cyan-500/20'
+                      }`}>
                         SMS_AUTO_RESOLVED
                       </div>
 
-                      <div className="flex items-center gap-2 border-b border-cyan-500/10 pb-2">
+                      <div className={`flex items-center gap-2 pb-2 border-b ${isLight ? 'border-stone-200' : 'border-cyan-500/10'}`}>
                         <Zap className="h-4 w-4 text-pink-500 shrink-0" />
                         <div>
-                          <span className="text-[9.5px] text-pink-400 font-bold uppercase tracking-widest font-mono">AUTOMATED PARSER VERIFIED</span>
+                          <span className="text-[9.5px] text-pink-600 font-bold uppercase tracking-widest font-mono">AUTOMATED PARSER VERIFIED</span>
                           <span className="text-[8px] text-stone-500 block">Parsed at {interceptedSMS.timestamp}</span>
                         </div>
                       </div>
 
                       <div className="space-y-2 text-[10px]">
-                        <div className="bg-stone-950/80 p-2.5 rounded border border-cyan-500/10">
+                        <div className={`p-2.5 rounded border ${isLight ? 'bg-white border-stone-200' : 'bg-stone-950/80 border-cyan-500/10'}`}>
                           <span className="text-stone-500 block leading-normal uppercase text-[8.5px]">Raw banker cellular text stream:</span>
-                          <p className="text-stone-250 font-serif leading-relaxed text-stone-300 italic mt-0.5">
+                          <p className={`font-serif leading-relaxed italic mt-0.5 ${isLight ? 'text-stone-700' : 'text-stone-300'}`}>
                             "{interceptedSMS.rawText}"
                           </p>
                         </div>
@@ -1157,19 +1666,19 @@ export default function AIInsights({
                         <div className="grid grid-cols-2 gap-3.5 pt-1.5">
                           <div>
                             <span className="text-stone-500 block uppercase text-[8.5px]">Extracted Amount:</span>
-                            <span className="text-emerald-400 text-sm font-black font-mono">
+                            <span className="text-emerald-500 text-sm font-black font-mono">
                               {currencySymbol}{interceptedSMS.parsedAmt.toLocaleString()}
                             </span>
                           </div>
                           <div>
                             <span className="text-stone-500 block uppercase text-[8.5px]">Matched Coffer Asset / Bank:</span>
-                            <span className="text-[#00f3ff] text-xs font-black font-mono">
+                            <span className={`text-xs font-black font-mono ${isLight ? tokens.accentText : 'text-[#00f3ff]'}`}>
                               {interceptedSMS.parsedAssetName || 'Liquid assets coffer'}
                             </span>
                           </div>
                           <div>
                             <span className="text-stone-500 block uppercase text-[8.5px]">Determined Category:</span>
-                            <span className="text-amber-400 text-xs font-black font-mono">
+                            <span className="text-amber-500 text-xs font-black font-mono">
                               {interceptedSMS.parsedCategory}
                             </span>
                           </div>

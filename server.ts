@@ -6,7 +6,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -141,6 +141,110 @@ The secure gateway caught an unexpected exception during portfolio evaluation:
 \`${e?.message || 'Cognitive sync timed out.'}\`
 
 Your local sandboxed portfolio metrics and heuristic calculators continue to run securely offline.`
+      });
+    }
+  });
+
+  // API Route: Secure server-side predictive transaction classification
+  app.post("/api/predict-transaction", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.json({
+          error: "No Gemini API key available",
+          fallback: true
+        });
+      }
+
+      const { rawText, history = [], assets = [], categories = [] } = req.body;
+      if (!rawText || typeof rawText !== "string") {
+        return res.json({ error: "No raw text provided" });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      const bankAssetsStr = assets
+        .filter((a: any) => a.type === 'BANK_BALANCE' || a.type === 'CASH_CARRY')
+        .map((a: any) => `ID: "${a.id}", Name: "${a.name}", Institution: "${a.institution}", Balance: ${a.currentValue}`)
+        .join("\n");
+
+      const systemPrompt = `You are the Echelon Sovereign financial intelligence engine.
+Your task is to parse a raw financial transaction alert message (like SMS or bank notification) and predict its properties using a strict schema.
+
+List of custom categories that the user uses (IMPORTANT: Prefer matching one of these categories if applicable):
+${JSON.stringify(categories)}
+
+List of bank accounts and credit cards available in the vault to debit from:
+${bankAssetsStr || "No accounts configured."}
+
+Previous ledger knowledge (historical transaction entries that show previous note-to-category associations):
+${JSON.stringify(history.slice(-20))}
+
+Guidelines:
+1. Extract the transaction amount.
+2. Predict the correct category. Prioritize matching the categories provided in the custom category list. If nothing matches, fall back to "Shopping" or the most accurate fallback category.
+3. Determine which bank account or liquid asset was likely debited based on the institution keywords (e.g. "HDFC", "SBI", "ICICI", "Axis"). Return the matched ID and matched name. If no clear bank is detected, return empty string for ID and 'Liquid Assets' for name.
+4. Predict a clean, elegant merchant note or description (e.g., "Uber Cab", "Zomato Dining", "HDFC Credit Bill"). Make it descriptive and human-readable. Do not include raw alert text or dates in the merchant note.
+5. Provide a short "matchReason" stating how previous knowledge or keyword triggers were used.
+6. If the raw message does not appear to contain a transaction or if it's completely unparseable, estimate reasonable default values.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: `Raw message to parse and predict: "${rawText}"`,
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              parsedAmt: {
+                type: Type.NUMBER,
+                description: "The extracted numerical amount of the transaction.",
+              },
+              parsedCategory: {
+                type: Type.STRING,
+                description: "The predicted category for the transaction (must correspond closely to the custom categories if possible).",
+              },
+              merchant: {
+                type: Type.STRING,
+                description: "Cleaned merchant or spend notes (e.g., 'Swiggy Food Delivery' instead of 'Swg12').",
+              },
+              parsedAssetId: {
+                type: Type.STRING,
+                description: "The matched ID of the source asset/bank account from the provided list, or empty string.",
+              },
+              parsedAssetName: {
+                type: Type.STRING,
+                description: "The matched name of the source bank account, or 'Liquid Assets Portfolio' if none.",
+              },
+              matchReason: {
+                type: Type.STRING,
+                description: "A short, professional explanation of the intelligence logic or prior ledger knowledge used.",
+              },
+            },
+            required: ["parsedAmt", "parsedCategory", "merchant", "parsedAssetId", "parsedAssetName", "matchReason"],
+          }
+        }
+      });
+
+      if (response && response.text) {
+        const predictions = JSON.parse(response.text.trim());
+        return res.json(predictions);
+      } else {
+        throw new Error("No response text from Gemini");
+      }
+    } catch (err: any) {
+      console.warn("Prediction gateway failed:", err?.message || err);
+      return res.json({
+        error: err?.message || "Failed to query Gemini prediction engine",
+        fallback: true
       });
     }
   });
