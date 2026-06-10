@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
-import { Shield, Eye, EyeOff, KeyRound, LockKeyhole, Info } from 'lucide-react';
+import { Shield, Eye, EyeOff, KeyRound, LockKeyhole, Info, Volume2, VolumeX, ShieldAlert, Cpu } from 'lucide-react';
 import { EchelonTheme } from '../types';
 import { getColorTokens } from '../utils/theme';
 import { hashPin } from '../utils/security';
@@ -18,6 +13,53 @@ interface PasscodeScreenProps {
   selectedGalleryIcon?: 'stealth-matte-gold' | 'vanguard-black-steel' | 'regal-obsidian-gold';
   onResetApp?: () => void;
 }
+
+// Retro-alien cyber-tech sound synthesizers using Web Audio API
+const playPinSound = (type: 'tick' | 'error' | 'access_granted') => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (type === 'tick') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime); // High pitch tick
+      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'error') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120, audioCtx.currentTime); // low buzz
+      osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.38);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.4);
+    } else if (type === 'access_granted') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      osc.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.08); // C#5
+      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.16); // E5
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.24); // A5
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.45);
+    }
+  } catch (e) {
+    // blocked or unsupported
+  }
+};
 
 export default function PasscodeScreen({ 
   theme, 
@@ -37,6 +79,7 @@ export default function PasscodeScreen({
 
   const [wrongAttempts, setWrongAttempts] = useState<number>(0);
   const [showForgotConfirm, setShowForgotConfirm] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   useEffect(() => {
     setIsRegistering(!pinHash);
@@ -46,23 +89,32 @@ export default function PasscodeScreen({
   }, [pinHash]);
 
   const tokens = getColorTokens(theme);
+  const isLight = theme.mode === 'light';
 
   const handleKeyPress = (num: string) => {
     if (pin.length < 4) {
       const nextPin = pin + num;
       setPin(nextPin);
       setErrorMsg('');
+      if (soundEnabled) playPinSound('tick');
     }
   };
 
+  const handleClear = () => {
+    setPin('');
+    if (soundEnabled) playPinSound('tick');
+  };
+
   const handleBackspace = () => {
-    setPin(pin.slice(0, -1));
+    setPin(prev => prev.slice(0, -1));
+    if (soundEnabled) playPinSound('tick');
   };
 
   const verifyOrSet = () => {
     if (pin.length < 4) {
-      setErrorMsg('PIN must be 4 digits');
+      setErrorMsg('DEC_PIN must be complete 4 hexadecimal channels');
       triggerShake();
+      if (soundEnabled) playPinSound('error');
       return;
     }
 
@@ -71,15 +123,18 @@ export default function PasscodeScreen({
         setConfirmPin(pin);
         setPin('');
         setStep(2);
+        if (soundEnabled) playPinSound('access_granted');
       } else {
         if (pin === confirmPin) {
           onSetPin(pin);
+          if (soundEnabled) playPinSound('access_granted');
         } else {
-          setErrorMsg('PINs do not match. Resetting...');
+          setErrorMsg('CIPHER_MISMATCH: Passcode confirmation does not resolve. Redoing set...');
           setPin('');
           setConfirmPin('');
           setStep(1);
           triggerShake();
+          if (soundEnabled) playPinSound('error');
         }
       }
     } else {
@@ -88,19 +143,30 @@ export default function PasscodeScreen({
         setWrongAttempts((prev) => {
           const next = prev + 1;
           if (next >= 3) {
-            setErrorMsg(`Invalid Vault PIN. Decryption Failed. (Attempts: ${next})`);
+            setErrorMsg(`SECURITY BREACH WARNING: Decryption key failed. Wipe threshold imminent. (Attempts: ${next}/4)`);
           } else {
-            setErrorMsg('Invalid Vault PIN. Decryption Failed.');
+            setErrorMsg('DECRYPTION FAILURE: Access code invalid.');
           }
           return next;
         });
         setPin('');
         triggerShake();
+        if (soundEnabled) playPinSound('error');
       } else {
         setWrongAttempts(0);
+        if (soundEnabled) playPinSound('access_granted');
       }
     }
   };
+
+  useEffect(() => {
+    if (pin.length === 4) {
+      const timer = setTimeout(() => {
+        verifyOrSet();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [pin]);
 
   const triggerShake = () => {
     setShake(true);
@@ -119,59 +185,61 @@ export default function PasscodeScreen({
     setPin('');
     setConfirmPin('');
     setShowForgotConfirm(false);
-    setErrorMsg('System formatted. Set up a brand new 4-digit PIN:');
+    setErrorMsg('DATABASE RE-INSTANTIATED: Setup a new 4-digit security code:');
+    if (soundEnabled) playPinSound('access_granted');
   };
 
   return (
-    <div id="secure-unlock-screen" className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-500 ${tokens.bg}`}>
+    <div id="secure-unlock-screen" className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 ${tokens.bg} font-mono text-xs transition-colors duration-500`}>
       
-      {/* Background patterns */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-amber-500/30 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-teal-500/30 blur-3xl" />
-      </div>
+      {/* Blueprint grid lines layout */}
+      <div className={`absolute inset-0 bg-grid-pattern ${isLight ? 'opacity-5' : 'opacity-10'} pointer-events-none select-none`} />
+      <div className={`absolute top-0 inset-x-0 h-44 bg-gradient-to-b ${isLight ? 'from-sky-500/5' : 'from-cyan-500/5'} to-transparent blur-3xl pointer-events-none`} />
 
-      <div className={`w-full max-w-md p-8 rounded-3xl border ${tokens.card} ${tokens.glow} text-center relative overflow-hidden transition-all duration-300 ${shake ? 'animate-bounce' : ''}`}>
+      <div className={`w-full max-w-sm p-8 rounded-3xl ${tokens.card} ${tokens.glow} border text-center relative overflow-hidden transition-all duration-300 ${shake ? 'animate-bounce' : ''}`}>
         
+        {/* Glowing laser scanning horizontal swipe */}
+        <div className={`absolute inset-x-0 top-0 h-[1.5px] ${isLight ? 'bg-sky-400/20' : 'bg-cyan-550/30'} pointer-events-none`} />
+
         {/* Top Header Logo */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="h-16 w-16 bg-[#141517] rounded-3xl border border-stone-800 p-1.5 flex items-center justify-center shadow-2xl mb-4 select-none">
+        <div className="flex flex-col items-center mb-5">
+          <div className={`h-14 w-14 ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-[#030308] border-stone-850'} rounded-2xl border p-1.5 flex items-center justify-center mb-3 select-none`}>
             <EchelonIcon name={selectedGalleryIcon || 'stealth-matte-gold'} size="100%" />
           </div>
 
-          <h1 className={`text-2xl font-bold tracking-tight ${tokens.textPrimary}`}>ECHELON</h1>
-          <p className={`text-xs uppercase tracking-widest font-mono text-amber-500 mt-1`}>BUILD QUIET WEALTH</p>
-          <div className="flex items-center gap-1.5 mt-2 text-xs bg-stone-300/10 px-2.5 py-1 rounded-full text-zinc-400">
-            <Shield className="h-3 w-3 text-emerald-400" />
-            <span>AES-256 Client-Side Payload Cipher</span>
-          </div>
+          <h1 className={`text-base font-mono font-black tracking-widest uppercase ${tokens.textPrimary}`}>ECHELON</h1>
+          <p className={`text-[10px] lowercase font-bold tracking-wider select-none ${tokens.textSecondary} opacity-70 mt-1`}>• build quiet wealth</p>
         </div>
 
-        {/* Action instruction */}
-        <p className={`text-sm mb-6 ${tokens.textSecondary}`}>
+        {/* Decryption status */}
+        <p className={`text-[10px] mb-5 font-mono ${tokens.textSecondary}`}>
           {isRegistering 
-            ? (step === 1 ? 'Configure an Offline Access PIN to encrypt your ledgers:' : 'Re-verify Your Security Access PIN:') 
-            : 'Enter secure key code to decrypt your private treasury:'
+            ? (step === 1 ? 'Configure 4-digit passkey:' : 'Confirm 4-digit passkey:') 
+            : 'Enter passkey to open ledger:'
           }
         </p>
 
         {/* Glowing Pin dots indicator */}
-        <div className="flex justify-center gap-4 mb-6">
+        <div className="flex justify-center gap-4 mb-5">
           {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
-              className={`h-4 w-4 rounded-full transition-all duration-200 border ${
+              className={`h-3.5 w-3.5 rounded-full transition-all duration-300 border ${
                 pin.length > index
-                  ? 'bg-amber-500 border-amber-500 scale-125 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
-                  : 'bg-transparent border-stone-600'
+                  ? isLight
+                    ? 'bg-teal-650 border-teal-600 scale-110 shadow-xs'
+                    : 'bg-amber-550 border-amber-500 scale-110 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                  : isLight
+                    ? 'bg-transparent border-stone-300'
+                    : 'bg-transparent border-stone-800'
               }`}
             />
           ))}
         </div>
 
-        {/* Quick Forgot PIN Option link */}
+        {/* Forgot PIN/Format Option link */}
         {!isRegistering && (
-          <div className="mb-4 -mt-3">
+          <div className="mb-4">
             <button
               type="button"
               id="quick-forgot-pin-btn"
@@ -179,54 +247,48 @@ export default function PasscodeScreen({
                 setShowForgotConfirm(true);
                 setWrongAttempts(0);
               }}
-              className="text-xs text-stone-400 hover:text-amber-500 transition-colors font-medium cursor-pointer underline underline-offset-4 decoration-stone-600 hover:decoration-amber-500"
+              className="text-[9.5px] text-stone-500 hover:text-stone-300 transition-colors font-mono uppercase"
             >
-              Forgot PIN?
+              Forgot Crypt PIN?
             </button>
           </div>
         )}
 
         {/* Error notification */}
         {errorMsg && (
-          <p className="text-xs text-red-500 font-semibold mb-4 animate-pulse">
+          <p className="text-[10px] text-rose-500 font-extrabold mb-4 animate-pulse uppercase leading-relaxed border border-rose-500/20 bg-rose-500/5 p-2 rounded">
             {errorMsg}
           </p>
         )}
 
-        {/* Dynamic Reset prompt on multiple failures */}
+        {/* Hard reset warnings */}
         {wrongAttempts >= 3 && !showForgotConfirm && (
-          <div className="my-5 p-4 rounded-2xl border border-rose-500/20 bg-rose-950/20 text-left space-y-3 shadow-md">
-            <div className="flex items-start gap-2.5">
-              <Info className="h-4 w-4 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
+          <div className="my-4 p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 text-left space-y-2.5">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="h-4.5 w-4.5 text-rose-500 shrink-0 mt-0.5 animate-bounce" />
               <div>
-                <span className="text-xs font-bold text-rose-250 block text-rose-200">Perform Security Reset?</span>
-                <p className="text-[10px] text-stone-400 mt-1 leading-relaxed">
-                  You have entered the wrong passcode multiple times. Would you like to perform a hard reset and wipe the current database to create a new key?
+                <span className="text-[11px] font-black text-rose-455 block uppercase text-rose-400">EMERGENCY FLUSH ACTIVATE?</span>
+                <p className="text-[9.5px] text-stone-400 mt-1 leading-relaxed">
+                  Too many unauthorized decryption failures detected. System integrity requires a hard format of stored caches.
                 </p>
               </div>
-            </div>
-            <div className="bg-stone-950/60 p-2.5 rounded-xl border border-rose-950/40">
-              <span className="text-[9px] uppercase font-bold text-rose-400 font-mono block">⚠️ CRITICAL WARNING</span>
-              <p className="text-[9px] text-stone-500 mt-0.5 leading-tight">
-                This will perform a hard reset and permanently erase all existing data in the application.
-              </p>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 id="wrong-attempts-reset-yes-btn"
                 onClick={executeHardReset}
-                className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-bold font-mono tracking-wider transition-all shadow cursor-pointer text-center"
+                className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold font-mono uppercase tracking-wider text-[9px] cursor-pointer"
               >
-                Yes, Reset Application
+                FORMAT DATABASE
               </button>
               <button
                 type="button"
                 id="wrong-attempts-reset-dismiss-btn"
                 onClick={() => setWrongAttempts(0)}
-                className="py-1.5 px-3 border border-stone-800 hover:bg-stone-850/50 text-stone-300 rounded-xl text-[10px] font-mono transition-all cursor-pointer"
+                className="py-1.5 px-3 border border-stone-800 hover:bg-stone-900 text-stone-400 rounded text-[9px]"
               >
-                Dismiss
+                DISMISS
               </button>
             </div>
           </div>
@@ -234,52 +296,50 @@ export default function PasscodeScreen({
 
         {/* Custom Forgot PIN Confirmation Card */}
         {showForgotConfirm && (
-          <div className="my-5 p-4 rounded-2xl border border-rose-500/30 bg-rose-950/30 text-left space-y-3 shadow-2xl animate-pulse">
-            <div className="flex items-start gap-2.5">
-              <Info className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+          <div className="my-4 p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 text-left space-y-2.5">
+            <div className="flex items-start gap-2">
+              <Info className="h-4.5 w-4.5 text-rose-500 shrink-0 mt-0.5" />
               <div>
-                <span className="text-xs font-bold text-rose-100 block">Reset Echelon Application?</span>
-                <p className="text-[10px] text-stone-400 mt-1 leading-relaxed">
-                  Requesting passcode or database formatting. This will securely erase your local Echelon ledger database files entirely. Like starting the application from scratch, you will immediately configure a brand-new access PIN.
+                <span className="text-[11px] font-black block text-rose-400 uppercase">PURGE ECHELON MATRIX?</span>
+                <p className="text-[9.5px] text-stone-400 mt-1 leading-normal">
+                  Decrypting local storage requires standard PIN. Wiping will delete all registered assets, loan targets, and transaction histories permanently.
                 </p>
               </div>
-            </div>
-            <div className="bg-stone-950/60 p-2.5 rounded-xl border border-rose-950/50">
-              <span className="text-[9px] uppercase font-bold text-rose-400 font-mono block">⚠️ RESET CONSEQUENCES</span>
-              <p className="text-[9px] text-stone-500 mt-0.5 leading-tight">
-                This action is permanent. All budget targets, current assets list, active loan contracts, and history reports will be completely wiped out.
-              </p>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 id="forgot-pin-confirm-yes-btn"
                 onClick={executeHardReset}
-                className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-bold font-mono tracking-wider transition-all shadow cursor-pointer text-center"
+                className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold font-mono uppercase text-[9px] tracking-wider cursor-pointer text-center"
               >
-                Yes, Reset Echelon
+                CONFIRM FORMAT
               </button>
               <button
                 type="button"
                 id="forgot-pin-confirm-cancel-btn"
                 onClick={() => setShowForgotConfirm(false)}
-                className="py-1.5 px-3 border border-stone-800 hover:bg-stone-850/50 text-stone-300 rounded-xl text-[10px] font-mono transition-all cursor-pointer"
+                className="py-1.5 px-3 border border-stone-800 hover:bg-stone-900 text-stone-400 rounded text-[9px]"
               >
-                Cancel
+                CANCEL
               </button>
             </div>
           </div>
         )}
 
         {/* Interactive Keypad dial */}
-        <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto mb-6">
+        <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto mb-2">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
             <button
               key={num}
               type="button"
               id={`dial-btn-${num}`}
               onClick={() => handleKeyPress(num)}
-              className={`h-14 rounded-2xl font-mono text-xl font-bold transition-all border flex items-center justify-center ${tokens.card} ${tokens.textPrimary} hover:scale-105 active:scale-95`}
+              className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
+                isLight 
+                  ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-stone-850 shadow-xs' 
+                  : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-stone-100/90 hover:border-stone-700'
+              }`}
             >
               {num}
             </button>
@@ -287,8 +347,12 @@ export default function PasscodeScreen({
           <button
             type="button"
             id="dial-btn-clear"
-            onClick={handleBackspace}
-            className={`h-14 rounded-2xl font-mono text-xs font-semibold uppercase flex items-center justify-center ${tokens.card} ${tokens.textSecondary} hover:text-amber-500`}
+            onClick={handleClear}
+            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] uppercase font-bold rounded-xl ${
+              isLight 
+                ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-pink-600 hover:border-pink-300' 
+                : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-pink-500 hover:border-pink-500/45'
+            }`}
           >
             Clear
           </button>
@@ -296,32 +360,25 @@ export default function PasscodeScreen({
             type="button"
             id="dial-btn-0"
             onClick={() => handleKeyPress('0')}
-            className={`h-14 rounded-2xl font-mono text-xl font-bold border flex items-center justify-center ${tokens.card} ${tokens.textPrimary} hover:scale-105`}
+            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-sm font-extrabold rounded-xl hover:scale-105 active:scale-95 ${
+              isLight 
+                ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-stone-850 shadow-xs' 
+                : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-stone-100/90 hover:border-stone-700'
+            }`}
           >
             0
           </button>
           <button
             type="button"
-            id="dial-btn-confirm"
-            onClick={verifyOrSet}
-            className="h-14 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold transition-all text-xs uppercase flex items-center justify-center tracking-wider shadow-md hover:scale-105 active:scale-95"
+            id="dial-btn-backspace"
+            onClick={handleBackspace}
+            className={`h-11 border transition-all flex items-center justify-center cursor-pointer font-mono text-[9.5px] uppercase font-bold rounded-xl hover:scale-105 active:scale-95 ${
+              isLight 
+                ? 'border-stone-250 bg-stone-50 hover:bg-stone-100 text-teal-600 hover:border-teal-300 shadow-xs' 
+                : 'border-stone-850/80 bg-zinc-950/40 hover:bg-stone-900/40 text-teal-400 hover:border-teal-500/45'
+            }`}
           >
-            Verify
-          </button>
-        </div>
-
-        {/* Forgot PIN Purge Mechanism */}
-        <div className="pt-5 border-t border-dashed border-stone-300/10 mt-4">
-          <p className="text-[10px] text-stone-500 mb-2 leading-relaxed">
-            Forget your passcode? Request a hard-reset of your Echelon database. Doing so will permanently delete all records inside this application.
-          </p>
-          <button
-            type="button"
-            id="forgot-pin-reset-app-btn"
-            onClick={() => setShowForgotConfirm(true)}
-            className="text-[10px] text-rose-500 hover:text-rose-400 font-mono font-bold uppercase tracking-wider transition-all border border-rose-500/10 px-3 py-1.5 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 cursor-pointer"
-          >
-            Purge Ledger DB & Reset PIN
+            Del
           </button>
         </div>
 

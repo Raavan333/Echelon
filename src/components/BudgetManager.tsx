@@ -127,6 +127,7 @@ export default function BudgetManager({
   const [editExpenseNotes, setEditExpenseNotes] = useState<string>('');
 
   const tokens = getColorTokens(theme);
+  const isLight = theme.mode === 'light';
 
   // Spend totals calculations
   const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -411,7 +412,7 @@ export default function BudgetManager({
                       {activeCategories.map((c, index) => {
                         const isEditing = editingCategoryIndex === index;
                         return (
-                          <div key={index} className="flex flex-col gap-1.5 p-2 bg-zinc-950 rounded-xl border border-stone-900">
+                          <div key={index} className={`flex flex-col gap-1.5 p-2 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-zinc-950 border-stone-900'}`}>
                             {isEditing ? (
                               <div className="space-y-1.5">
                                 <div className="flex gap-1.5">
@@ -419,7 +420,7 @@ export default function BudgetManager({
                                     type="text"
                                     value={editingCatName}
                                     onChange={(e) => setEditingCatName(e.target.value)}
-                                    className="flex-1 min-w-0 px-2 py-1 bg-stone-900 border border-stone-800 rounded text-xs text-white outline-none"
+                                    className={`flex-1 min-w-0 px-2 py-1 border rounded text-xs outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                                     placeholder="Category Name"
                                   />
                                   <input
@@ -597,8 +598,10 @@ export default function BudgetManager({
                     onClick={() => setSourceType('bank_balance')}
                     className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
                       sourceType === 'bank_balance' 
-                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
-                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                        ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30' 
+                        : isLight
+                          ? 'border-stone-250 text-stone-600 hover:bg-stone-100 bg-white shadow-xs'
+                          : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
                     }`}
                   >
                     Bank Account
@@ -608,8 +611,10 @@ export default function BudgetManager({
                     onClick={() => setSourceType('credit_card')}
                     className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
                       sourceType === 'credit_card' 
-                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
-                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                        ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30' 
+                        : isLight
+                          ? 'border-stone-250 text-stone-600 hover:bg-stone-100 bg-white shadow-xs'
+                          : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
                     }`}
                   >
                     Credit Card
@@ -619,8 +624,10 @@ export default function BudgetManager({
                     onClick={() => setSourceType('cash_carry')}
                     className={`flex-1 py-1.5 px-2.5 border rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap ${
                       sourceType === 'cash_carry' 
-                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
-                        : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
+                        ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30' 
+                        : isLight
+                          ? 'border-stone-250 text-stone-600 hover:bg-stone-100 bg-white shadow-xs'
+                          : 'border-stone-800 text-stone-400 hover:bg-stone-800/40 bg-zinc-950'
                     }`}
                   >
                     Cash Wallet
@@ -977,50 +984,47 @@ export default function BudgetManager({
               const savePct = total > 0 ? (point.save / total) * 100 : 0;
 
               return (
-                <div key={idx} className="space-y-2.5 p-3.5 rounded-xl bg-stone-500/5 border border-stone-800/10">
+                <div key={idx} className="space-y-3 p-4 bg-[#09090f]/80 rounded-2xl border border-stone-850">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold font-mono text-stone-300">{point.label}</span>
-                    <span className="text-[10px] font-mono text-stone-500 uppercase">
-                      Quotient:{' '}
+                    <span className="text-xs font-bold font-mono text-stone-200 tracking-wide">{point.label}</span>
+                    <span className="text-[10px] font-mono text-stone-400">
+                      Savings rate:{' '}
                       {total > 0 ? (
-                        <strong className="text-emerald-400">{savePct.toFixed(1)}% Saved</strong>
+                        <span className="text-emerald-400 font-bold">{savePct.toFixed(1)}%</span>
                       ) : (
-                        <strong className="text-stone-550 italic">Empty</strong>
+                        <span className="text-stone-500 italic">No activity record</span>
                       )}
                     </span>
                   </div>
 
-                  {/* Dual Bar Graphic Chart */}
-                  <div className="space-y-1.5">
-                    {/* Spent bar */}
-                    <div>
-                      <div className="flex justify-between text-[10px] text-stone-400 mb-0.5 font-mono">
-                        <span>🔴 Spent outlay</span>
-                        <span className="text-red-400 font-semibold">
-                          {total > 0 ? `${currencySymbol}${point.spend.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${spendPct.toFixed(0)}%)` : `${currencySymbol}0`}
-                        </span>
-                      </div>
-                      <div className="w-full bg-[#111116] h-2 rounded-full overflow-hidden border border-stone-850">
-                        <div
-                          className="bg-red-500 h-full rounded-full transition-all duration-500 animate-pulse"
-                          style={{ width: `${spendPct}%` }}
-                        />
-                      </div>
+                  {/* Sleek single stacked progress vector */}
+                  <div className="space-y-2.5">
+                    <div className="w-full bg-[#111116] h-2.5 rounded-full overflow-hidden flex border border-stone-850">
+                      <div
+                        className="bg-red-500 h-full transition-all duration-500"
+                        style={{ width: `${spendPct}%` }}
+                      />
+                      <div
+                        className="bg-emerald-500 h-full transition-all duration-500"
+                        style={{ width: `${savePct}%` }}
+                      />
                     </div>
-
-                    {/* Saved bar */}
-                    <div>
-                      <div className="flex justify-between text-[10px] text-stone-400 mb-0.5 font-mono">
-                        <span>🟢 Savings retained</span>
-                        <span className="text-emerald-400 font-semibold">
-                          {total > 0 ? `${currencySymbol}${point.save.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${savePct.toFixed(0)}%)` : `${currencySymbol}0`}
+                    
+                    {/* Professional detailed legends */}
+                    <div className="grid grid-cols-2 gap-3.5 pt-1">
+                      <div className="text-[10px] font-mono flex flex-col">
+                        <span className="text-stone-500 uppercase tracking-widest text-[8px] font-bold">Allocated Expenditures</span>
+                        <span className="text-stone-200 font-bold mt-0.5">
+                          {currencySymbol}{point.spend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          <span className="text-stone-500 font-normal ml-1">({spendPct.toFixed(0)}%)</span>
                         </span>
                       </div>
-                      <div className="w-full bg-[#111116] h-2 rounded-full overflow-hidden border border-stone-850">
-                        <div
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-500 animate-pulse"
-                          style={{ width: `${savePct}%` }}
-                        />
+                      <div className="text-[10px] font-mono flex flex-col">
+                        <span className="text-stone-500 uppercase tracking-widest text-[8px] font-bold">Unspent Reserves Retained</span>
+                        <span className="text-emerald-400 font-bold mt-0.5">
+                          {currencySymbol}{point.save.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          <span className="text-stone-500 font-normal ml-1">({savePct.toFixed(0)}%)</span>
+                        </span>
                       </div>
                     </div>
                   </div>

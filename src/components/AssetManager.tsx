@@ -174,6 +174,7 @@ export default function AssetManager({
   const [shifterSuccess, setShifterSuccess] = useState<string>('');
 
   const tokens = getColorTokens(theme);
+  const isLight = theme.mode === 'light';
 
   const handleExecuteShifter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -925,8 +926,8 @@ export default function AssetManager({
                     </tr>
 
                     {isEditing && (
-                      <tr className="border-b border-stone-800 bg-amber-500/5">
-                        <td colSpan={7} className="p-4 bg-zinc-950/80">
+                      <tr className={`border-b ${isLight ? 'border-stone-200 bg-amber-500/5' : 'border-stone-800 bg-amber-500/5'}`}>
+                        <td colSpan={7} className={`p-4 ${isLight ? 'bg-stone-50 text-stone-900 border-t border-b border-stone-200/60' : 'bg-zinc-950/80'}`}>
                           <div className="space-y-4 max-w-4xl mx-auto">
                             <div className="text-xs font-bold text-amber-500 uppercase font-mono tracking-wider">
                               Update Holding Details for {asset.name}
@@ -1086,14 +1087,14 @@ export default function AssetManager({
       {/* SUB-TAB: INTER-FUND SHIFTER WORKFLOW */}
       {managerTab === 'shifter' && (
         <div className="space-y-6 animate-fade-in mt-4">
-          <div className="p-4 rounded-2xl bg-zinc-950/40 border border-stone-850/50 space-y-2">
+          <div className={`p-4 rounded-2xl border space-y-2 ${isLight ? 'bg-stone-55 border-stone-200' : 'bg-zinc-950/40 border-stone-850/50'}`}>
             <span className="text-[10px] uppercase font-bold text-amber-500 font-mono block">Sovereign Inter-Allocation Shift Board</span>
-            <p className="text-xs text-stone-400 leading-relaxed">
-              Dynamically shift balances from one asset to another. This simulates or executes real ledger modifications: stock sales lock in <strong className="text-emerald-400">Capital Gains</strong> which instantly updates your net worth, while early Fixed Deposit breaks subtract <strong className="text-rose-400">Breakout Penalties</strong>, properly recorded client-side in history so that anyone can make sense of your asset movements.
+            <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-700' : 'text-stone-400'}`}>
+              Dynamically shift balances from one asset to another. This simulates or executes real ledger modifications: stock sales lock in <strong className="text-emerald-400 font-bold">Capital Gains</strong> which instantly updates your net worth, while early Fixed Deposit breaks subtract <strong className="text-rose-400 font-bold">Breakout Penalties</strong>, properly recorded client-side in history so that anyone can make sense of your asset movements.
             </p>
           </div>
 
-          <form onSubmit={handleExecuteShifter} className="p-5 border border-stone-800 rounded-2xl bg-stone-500/5 space-y-4">
+          <form onSubmit={handleExecuteShifter} className={`p-5 border rounded-2xl space-y-4 ${isLight ? 'bg-stone-50 border-stone-200 text-stone-900' : 'border-stone-800 bg-stone-500/5'}`}>
             <span className="text-xs font-bold text-stone-200 block border-b border-stone-800/40 pb-2 flex items-center gap-2">
               <ArrowRightLeft className="h-4 w-4 text-amber-500" />
               New Inter-Fund Capital Shift

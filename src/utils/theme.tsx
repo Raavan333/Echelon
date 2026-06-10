@@ -51,6 +51,44 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
   }
 
   switch (theme.palette) {
+    case 'skyblue-peacock':
+      tokens = {
+        bg: 'bg-gradient-to-br from-sky-100 to-teal-50',
+        card: 'bg-white border-sky-300 shadow-sm',
+        cardHover: 'hover:bg-sky-50/70 hover:border-teal-500 hover:shadow-[0_4px_16px_rgba(10,147,150,0.1)]',
+        textPrimary: 'text-[#005f73]',
+        textSecondary: 'text-[#0a9396]',
+        accent: 'bg-[#005f73] text-white font-medium',
+        accentHover: 'hover:bg-[#004b5c]',
+        accentText: 'text-[#005f73] font-bold',
+        border: 'border-sky-200',
+        borderAccent: 'border-teal-500',
+        buttonBg: 'bg-sky-100 hover:bg-sky-200 text-[#005f73]',
+        glow: 'shadow-[0_0_15px_rgba(10,147,150,0.15)]',
+        badgeBg: 'bg-teal-50 text-[#005f73] border border-teal-200',
+        badgeText: 'text-[#005f73]'
+      };
+      break;
+
+    case 'hotpink-marble':
+      tokens = {
+        bg: 'bg-gradient-to-tr from-stone-50 via-zinc-100 to-[#fff5f7]',
+        card: 'bg-white border-zinc-250 shadow-sm',
+        cardHover: 'hover:bg-[#fff0f5] hover:border-pink-500 hover:shadow-[0_4px_16px_rgba(219,39,119,0.08)]',
+        textPrimary: 'text-stone-800',
+        textSecondary: 'text-zinc-650',
+        accent: 'bg-pink-600 text-white font-medium',
+        accentHover: 'hover:bg-pink-700',
+        accentText: 'text-pink-600 font-bold',
+        border: 'border-zinc-200',
+        borderAccent: 'border-pink-500',
+        buttonBg: 'bg-[#fff0f5] hover:bg-pink-100 text-pink-700',
+        glow: 'shadow-[0_0_15px_rgba(219,39,119,0.15)]',
+        badgeBg: 'bg-[#fff0f5] text-pink-700 border border-pink-200',
+        badgeText: 'text-pink-700'
+      };
+      break;
+
     case 'skyblue':
       tokens = {
         bg: 'bg-sky-100',
@@ -299,20 +337,20 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
 
     case 'elegant-dark':
       tokens = {
-        bg: 'bg-[#020202]',
-        card: 'bg-[#0c0c0c] border-[#181818]',
-        cardHover: 'hover:border-[#333333] hover:bg-[#121212]',
-        textPrimary: 'text-[#f5f5f5]',
-        textSecondary: 'text-[#909090]',
-        accent: 'bg-[#ffffff] text-[#020202] font-semibold',
-        accentHover: 'hover:bg-[#e5e5e5]',
-        accentText: 'text-[#ffffff]',
-        border: 'border-[#181818]',
-        borderAccent: 'border-[#cccccc]',
-        buttonBg: 'bg-[#151515] hover:bg-[#1f1f1f] text-[#f5f5f5]',
-        glow: 'shadow-[0_0_15px_rgba(255,255,255,0.05)]',
-        badgeBg: 'bg-[#151515] text-[#909090] border border-[#222222]',
-        badgeText: 'text-[#f5f5f5]'
+        bg: 'bg-[#020206]',
+        card: 'bg-[#080811]/95 border border-cyan-500/25 shadow-[0_0_20px_rgba(6,182,212,0.15)] backdrop-blur-md',
+        cardHover: 'hover:border-pink-500/40 hover:bg-[#0c0d1e]/95 hover:shadow-[0_0_25px_rgba(236,72,153,0.2)]',
+        textPrimary: 'text-[#00f3ff] drop-shadow-[0_0_2px_rgba(0,243,255,0.3)] font-mono',
+        textSecondary: 'text-stone-400 font-mono text-[11px]',
+        accent: 'bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-stone-950 font-bold tracking-wider uppercase shadow-[0_0_15px_rgba(0,243,255,0.4)]',
+        accentHover: 'hover:opacity-90 hover:scale-105 transition-allDuration-300',
+        accentText: 'text-[#00f3ff] font-mono font-bold',
+        border: 'border-cyan-500/20',
+        borderAccent: 'border-fuchsia-500/40',
+        buttonBg: 'bg-[#0c0f1d] border border-cyan-500/20 hover:border-pink-500/50 text-cyan-400 hover:text-[#00f3ff] hover:bg-[#11172a] transition-all',
+        glow: 'shadow-[0_0_20px_rgba(6,182,212,0.2)]',
+        badgeBg: 'bg-cyan-500/10 text-[#00f3ff] border border-cyan-500/30 font-mono text-[10px]',
+        badgeText: 'text-[#00f3ff]'
       };
       break;
 

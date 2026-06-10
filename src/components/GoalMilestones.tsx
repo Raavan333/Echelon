@@ -72,6 +72,7 @@ export default function GoalMilestones({
   };
 
   const tokens = getColorTokens(theme);
+  const isLight = theme.mode === 'light';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +190,7 @@ export default function GoalMilestones({
                 id="goal-form-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className={`w-full px-3 py-2 bg-stone-950 font-semibold border ${tokens.border} rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500`}
+                className={`w-full px-3 py-2 font-semibold border ${tokens.border} rounded-xl text-xs focus:outline-none focus:border-amber-500 ${isLight ? 'bg-white text-stone-900 border-stone-250' : 'bg-stone-950 text-stone-200 border-stone-850'}`}
               >
                 <option value="Capital Base">Capital Base</option>
                 <option value="Sovereign Fund">Sovereign Fund</option>
@@ -202,8 +203,8 @@ export default function GoalMilestones({
           {/* Linked Assets Selection */}
           <div className="pt-2 border-t border-stone-800/20 dark:border-stone-100/10">
             <label className="text-[10px] uppercase font-bold text-stone-500 font-mono block mb-1.5">Asset & Fund Support (Scope Backing)</label>
-            <div className="p-3 bg-zinc-950/60 rounded-xl border border-stone-800 space-y-2">
-              <div className="flex items-center justify-between pb-1.5 border-b border-stone-850">
+            <div className={`p-3 rounded-xl border space-y-2 ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-zinc-950/60 border-stone-800'}`}>
+              <div className={`flex items-center justify-between pb-1.5 border-b ${isLight ? 'border-stone-200' : 'border-stone-850'}`}>
                 <span className="text-[10.5px] uppercase font-bold text-amber-500 font-mono">Include Specific Funds only</span>
                 <button
                   type="button"
@@ -231,8 +232,10 @@ export default function GoalMilestones({
                         key={asset.id} 
                         className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none transition-all ${
                           isChecked 
-                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' 
-                            : 'bg-zinc-950/30 border-stone-850 hover:bg-zinc-900/40 text-stone-400 hover:text-stone-300'
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 dark:text-amber-300 font-semibold' 
+                            : isLight
+                              ? 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 hover:text-stone-800'
+                              : 'bg-zinc-950/30 border-stone-850 hover:bg-zinc-900/40 text-stone-400 hover:text-stone-300'
                         }`}
                       >
                         <input
@@ -245,7 +248,7 @@ export default function GoalMilestones({
                               setSelectedAssetIds([...selectedAssetIds, asset.id]);
                             }
                           }}
-                          className="rounded border-stone-700 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-stone-900 h-3.5 w-3.5"
+                          className={`rounded h-3.5 w-3.5 text-amber-500 focus:ring-0 focus:ring-offset-0 ${isLight ? 'border-stone-300 bg-white' : 'border-stone-700 bg-stone-900'}`}
                         />
                         <div className="min-w-0 flex-1">
                           <span className="font-mono text-xs font-semibold block truncate leading-tight">{asset.name}</span>
@@ -309,7 +312,7 @@ export default function GoalMilestones({
                 return (
                   <div
                     key={g.id}
-                    className={`p-5 rounded-2xl border border-amber-500/30 bg-zinc-950 flex flex-col justify-between space-y-3 animate-fade-in text-xs`}
+                    className={`p-5 rounded-2xl border border-amber-500/30 flex flex-col justify-between space-y-3 animate-fade-in text-xs ${isLight ? 'bg-stone-55 border-stone-200' : 'bg-zinc-950'}`}
                   >
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider">
@@ -324,7 +327,7 @@ export default function GoalMilestones({
                         <select
                           value={editCategory}
                           onChange={(e) => setEditCategory(e.target.value)}
-                          className={`w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white focus:outline-none`}
+                          className={`w-full px-2 py-1 rounded-lg text-xs focus:outline-none ${isLight ? 'bg-white border border-stone-250 text-stone-900 font-medium' : 'bg-stone-900 border border-stone-800 text-white'}`}
                         >
                           <option value="Capital Base">Capital Base</option>
                           <option value="Sovereign Fund">Sovereign Fund</option>
