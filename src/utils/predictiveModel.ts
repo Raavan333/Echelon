@@ -298,6 +298,36 @@ export class ClientSovereignML {
       matchReason
     };
   }
+
+  /**
+   * Automatically categorizes an alert rule's severity based on historic user acknowledgements behavior memory.
+   * If the user previously acknowledged alerts for the same rule frequently, we align severity with user interest.
+   */
+  public autoCategorizeAlertSeverity(
+    ruleName: string, 
+    acknowledgedHistory: { ruleName: string; date: string }[], 
+    currentSpendAverage: number,
+    thresholdValue: number
+  ): 'warning' | 'info' {
+    const relevantAcks = acknowledgedHistory.filter(h => h.ruleName.toLowerCase() === ruleName.toLowerCase());
+    
+    // User has interacted with this alert rule type frequently; elevate priority
+    if (relevantAcks.length >= 3) {
+      return 'warning';
+    }
+
+    // High outlier spending threshold (> 50% average) raises priority
+    if (currentSpendAverage > 0 && thresholdValue > currentSpendAverage * 0.5) {
+      return 'warning';
+    }
+
+    const nameLower = ruleName.toLowerCase();
+    if (nameLower.includes('risk') || nameLower.includes('deficit') || nameLower.includes('high') || nameLower.includes('limit') || nameLower.includes('overrun')) {
+      return 'warning';
+    }
+
+    return 'info';
+  }
 }
 
 // Instantiate dynamic global singleton model to allow cross-module persistence

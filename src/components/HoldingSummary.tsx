@@ -277,12 +277,60 @@ export default function HoldingSummary({
     return () => clearInterval(interval);
   }, [netYieldAmount]);
 
-  // Gamified ranks
+  // Gamified ranks with dynamic earning velocity and present inflation matrices
   const getRankBadgeInfo = (val: number) => {
-    if (val < 100000) return { name: 'Quiet Apprentice • L1', color: 'bg-zinc-805 text-stone-300 border-zinc-700/50' };
-    if (val < 500000) return { name: 'Sovereign Aspirant • L2', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
-    if (val < 1500000) return { name: 'Capital Vanguard • L3', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
-    return { name: 'Echelon Overlord • L4', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+    const totalAnnualEarnings = (monthlyEarnings * 12) + onlyAssetsYieldAmount + lentLoansYieldAmount;
+    const activeInflationRate = 0.06; // Present Indian macroeconomic baseline inflation rate (6.0%)
+    const absoluteInflationDrag = Math.max(0, val * activeInflationRate);
+    const netPurchasingFlow = totalAnnualEarnings - absoluteInflationDrag;
+
+    const earnsZero = monthlyEarnings === 0 && val === 0;
+
+    if (earnsZero) {
+      return { 
+        name: 'Unfunded Sovereign • L0', 
+        color: 'bg-rose-500/10 text-rose-500 border-rose-500/30' + (isLight ? ' text-rose-700 bg-rose-50 border-rose-200' : ''),
+        desc: 'Assets & Earning velocity are absolute zero. Net growth is in severe inflation exposure.'
+      };
+    }
+
+    if (netPurchasingFlow <= 0) {
+      return { 
+        name: 'Inflation Deflector • L1', 
+        color: 'bg-zinc-850 text-stone-400 border-zinc-700/50' + (isLight ? ' text-stone-600 bg-stone-100 border-stone-250' : ''),
+        desc: 'Earning velocity and yields are currently losing real purchasing power to 6.0% inflation.'
+      };
+    }
+
+    // Dynamic purchasing power adjusted networth
+    const inflationAdjustedSurplus = val + (netPurchasingFlow * 0.5);
+
+    if (inflationAdjustedSurplus < 150000) {
+      return { 
+        name: 'Quiet Apprentice • L1', 
+        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' + (isLight ? ' text-blue-700 bg-blue-50 border-blue-200' : ''),
+        desc: 'Outpacing inflation securely. Accumulating momentum.'
+      };
+    }
+    if (inflationAdjustedSurplus < 600000) {
+      return { 
+        name: 'Capital Vanguard • L2', 
+        color: 'bg-teal-500/10 text-teal-400 border-teal-500/20' + (isLight ? ' text-teal-700 bg-teal-50 border-teal-200' : ''),
+        desc: 'Substantial portfolio expansion, outpacing inflation offsets cleanly.'
+      };
+    }
+    if (inflationAdjustedSurplus < 1600000) {
+      return { 
+        name: 'Echelon Commander • L3', 
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' + (isLight ? ' text-emerald-700 bg-emerald-50 border-emerald-200' : ''),
+        desc: 'High velocity compound trajectory. Real surplus expansion.'
+      };
+    }
+    return { 
+      name: 'Sovereign Emperor • L4', 
+      color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' + (isLight ? ' text-amber-700 bg-amber-50 border-amber-200' : ''),
+      desc: 'Absolute capital sovereignty. Portfolio wealth velocity is immune to standard inflation drag.'
+    };
   };
   const rankBadge = getRankBadgeInfo(totalPortfolioValue);
 
@@ -394,20 +442,25 @@ export default function HoldingSummary({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-[11px] font-black font-mono px-2 py-0.5 rounded-lg select-none border ${
-                blendedAPY >= 0 
-                  ? 'text-emerald-450 bg-emerald-500/10 border-emerald-500/20' 
-                  : 'text-pink-500 bg-pink-500/10 border-pink-500/20'
-              }`}>
-                {blendedAPY >= 0 ? '+' : ''}{blendedAPY.toFixed(2)}%/ YR
-              </span>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-[11px] font-black font-mono px-2 py-0.5 rounded-lg select-none border ${
+                  blendedAPY >= 0 
+                    ? 'text-emerald-450 bg-emerald-500/10 border-emerald-500/20' 
+                    : 'text-pink-500 bg-pink-500/10 border-pink-500/20'
+                }`}>
+                  {blendedAPY >= 0 ? '+' : ''}{blendedAPY.toFixed(2)}%/ YR
+                </span>
 
-              {/* Gamified wealth level tier badge */}
-              <div className={`flex items-center gap-1.5 px-3 py-1 border text-[10px] font-bold font-mono uppercase rounded-lg shadow-sm tracking-wide select-none ${rankBadge.color}`}>
-                <Award className="h-3.5 w-3.5" />
-                <span>{rankBadge.name}</span>
+                {/* Gamified wealth level tier badge */}
+                <div className={`flex items-center gap-1.5 px-3 py-1 border text-[10px] font-bold font-mono uppercase rounded-lg shadow-sm tracking-wide select-none ${rankBadge.color}`} title={rankBadge.desc}>
+                  <Award className="h-3.5 w-3.5" />
+                  <span>{rankBadge.name}</span>
+                </div>
               </div>
+              <p className={`text-[9.5px] leading-relaxed font-mono ${isLight ? 'text-stone-500' : 'text-stone-400 opacity-80'}`}>
+                🛡️ <span className="font-extrabold uppercase tracking-wide">Cognitive Directive:</span> {rankBadge.desc}
+              </p>
             </div>
           </div>
           

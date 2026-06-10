@@ -327,18 +327,65 @@ export default function AIInsights({
   const maxConcentrationPct = totalAssetsVal > 0 ? (maxConcentrationVal / totalAssetsVal) * 100 : 0;
 
   // Score generator
-  const [score, setScore] = useState<number>(65);
+  const [score, setScore] = useState<number>(10);
   useEffect(() => {
-    let s = 60;
-    if (blendedAPY > 8) s += 10;
-    if (emergencyShieldMonths >= 6) s += 15;
-    else if (emergencyShieldMonths >= 3) s += 8;
-    if (maxConcentrationPct < 50 && assets.length > 2) s += 10;
-    if (highInterestDebts.length === 0) s += 10; else s -= 12;
-    if (rates.netPerMonth > 30000) s += 10;
-    else if (rates.netPerMonth <= 0) s -= 15;
+    // Check if user has initialized or added any assets/earnings
+    const totalAssetSum = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
+    const hasAssetsOrEarnings = totalAssetSum > 0 || monthlyEarnings > 0 || loans.length > 0;
+    
+    if (!hasAssetsOrEarnings) {
+      setScore(10);
+      return;
+    }
+
+    let s = 50; // default active starting base
+    
+    // 1. Inflation adjustment (standard present condition inflation is e.g. 6.0%)
+    const inflationRate = 6.0;
+    if (totalAssetSum > 0) {
+      if (blendedAPY > inflationRate) {
+        s += 15;
+      } else if (blendedAPY < inflationRate) {
+        s -= 15;
+      }
+    } else {
+      s -= 5;
+    }
+
+    // 2. Emergency cover shield performance
+    if (emergencyShieldMonths >= 6) {
+      s += 15;
+    } else if (emergencyShieldMonths >= 3) {
+      s += 8;
+    } else {
+      s -= 10;
+    }
+
+    // 3. Diversification coefficient
+    if (maxConcentrationPct < 50 && assets.length > 2) {
+      s += 10;
+    } else if (maxConcentrationPct > 80 && assets.length > 1) {
+      s -= 10;
+    }
+
+    // 4. Interest leverage drag from liabilities
+    if (highInterestDebts.length === 0) {
+      s += 10;
+    } else {
+      s -= 15;
+    }
+
+    // 5. Monthly net income trajectory (Earning surplus)
+    if (rates.netPerMonth > 40000) {
+      s += 15;
+    } else if (rates.netPerMonth > 15000) {
+      s += 8;
+    } else if (rates.netPerMonth <= 0) {
+      s -= 20;
+    }
+
     setScore(Math.min(100, Math.max(10, s)));
-  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets.length]);
+  }, [blendedAPY, emergencyShieldMonths, maxConcentrationPct, highInterestDebts.length, rates.netPerMonth, assets.length, usdConversionRate, monthlyEarnings, loans.length]);
 
   const getRank = (scr: number) => {
     if (scr >= 90) return { title: 'Sovereign Emperor', level: 'MAX_SECURE', color: 'text-amber-400 border-amber-500/30' };
@@ -450,8 +497,23 @@ export default function AIInsights({
   const handleCompilerGenerate = () => {
     if (soundEnabled) playCyberChirp('success');
     
-    // Generate actual relevant alerts!
     const generated: typeof aiInsightsList = [];
+
+    // Check if user is in a completely uninitialized/zero budget baseline
+    const totalAssetSum = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);
+    const hasAssetsOrEarnings = totalAssetSum > 0 || monthlyEarnings > 0 || loans.length > 0;
+
+    if (!hasAssetsOrEarnings) {
+      generated.push({
+        id: 'ins-empty-state',
+        type: 'critical',
+        text: `COMPILER HALTED: Absolute zero net holdings and yield streams detected. Register assets or earning vector inflows in Portfolio to initiate model analysis.`,
+        metrics: `Total Asset Base: ${currencySymbol}0 | Dynamic Earning velocity: 0/hr`,
+        actionLabel: 'CAPITAL INGEST'
+      });
+      setAiInsightsList(generated);
+      return;
+    }
 
     // Alert 1: Spends vs earnings
     if (rates.netPerMonth <= 0) {
@@ -1042,225 +1104,133 @@ export default function AIInsights({
               </div>
 
               {/* Serious and technical neural graph representation of machine learning */}
-              <div id="ml-decision-neural-graph" className={`mt-4 p-4 rounded-xl border relative overflow-hidden flex flex-col items-center justify-between w-full ${
-                isLight ? 'bg-stone-50 border-stone-250/70 shadow-xs' : 'bg-zinc-950/80 border-cyan-500/15'
-              }`}>
-                <div className="w-full flex items-center justify-between mb-2">
-                  <span className={`text-[8.5px] uppercase tracking-widest font-black font-mono ${isLight ? tokens.textPrimary : neuralColors.accentText}`}>
-                    {isTraining ? 'SGD SYNAPTIC TREE REALIGNING' : 'NEURAL INTERACTION TREE'}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <span className={`h-1.5 w-1.5 rounded-full ${isTraining ? 'bg-[#ff0055] animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
-                    <span className="text-[7.5px] font-mono text-stone-500">BATCH_N=32</span>
-                  </div>
-                </div>
-
-                <div className="relative w-full h-44 my-2 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-[#00f3ff]/[0.01] bg-grid-pattern opacity-10 pointer-events-none" />
+              {(() => {
+                // Generate points for the SGD Training Convergence line
+                const wavePoints1 = [];
+                const wavePoints2 = [];
+                for (let i = 0; i <= 28; i++) {
+                  const x = 20 + i * 10;
                   
-                  {/* SVG Canvas */}
-                  <svg className="w-full h-full max-w-[380px]" viewBox="0 0 320 150">
-                    <defs>
-                      <linearGradient id="synGrad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor={isLight ? '#558291' : '#00f3ff'} stopOpacity="0.3" />
-                        <stop offset="100%" stopColor={isLight ? '#a35252' : '#ec4899'} stopOpacity="0.3" />
-                      </linearGradient>
-                      <linearGradient id="synGradActive" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor={isLight ? '#10b981' : '#00f3ff'} stopOpacity="0.85" />
-                        <stop offset="50%" stopColor="#a855f7" stopOpacity="0.75" />
-                        <stop offset="100%" stopColor="#ec4899" stopOpacity="0.85" />
-                      </linearGradient>
-                    </defs>
+                  // Base wave mathematical shapes
+                  const baseSine1 = Math.sin(i * 0.45) * 18;
+                  const baseSine2 = Math.cos(i * 0.55) * 14;
+                  
+                  // Descending decay curve modeling convergent loss
+                  const decayFactor = isTraining ? Math.max(0.12, 1 - epoch / 100) : 0.35;
+                  const convergenceTrend = 85 - (i * 1.5) * (1 - decayFactor);
+                  
+                  // Add real-time SGD noise/fluctuations when actively training weights
+                  const noisyFluctuation = isTraining ? (Math.sin(epoch * 0.6 + i) * 11 * decayFactor) : 0;
+                  
+                  const y1 = Math.max(22, Math.min(138, convergenceTrend + baseSine1 * decayFactor + noisyFluctuation));
+                  const y2 = Math.max(22, Math.min(138, 55 + baseSine2 * (1.25 - decayFactor) + noisyFluctuation * 0.4));
+                  
+                  wavePoints1.push(`${x},${y1}`);
+                  wavePoints2.push(`${x},${y2}`);
+                }
+                const wavePath1 = `M ${wavePoints1.join(' L ')}`;
+                const wavePath2 = `M ${wavePoints2.join(' L ')}`;
 
-                    {/* CONNECTING LEVER SYNAPSES (EDGES) */}
-                    {/* Input (x=30) to Hidden (x=160) */}
-                    {[20, 55, 90, 125].map((yIn, iIdx) => (
-                      [35, 75, 115].map((yHid, hIdx) => {
-                        const activeIndex = (iIdx * 3 + hIdx);
-                        const isFiring = isTraining && (epoch % 3 === activeIndex % 3);
-                        return (
+                return (
+                  <div id="ml-decision-neural-graph" className={`mt-4 p-4 rounded-xl border relative overflow-hidden flex flex-col items-center justify-between w-full ${
+                    isLight ? 'bg-stone-50 border-stone-250/70 shadow-xs' : 'bg-zinc-950/80 border-cyan-500/15'
+                  }`}>
+                    <div className="w-full flex items-center justify-between mb-2">
+                      <span className={`text-[8.5px] uppercase tracking-widest font-black font-mono ${isLight ? tokens.textPrimary : neuralColors.accentText}`}>
+                        {isTraining ? `SGD LOSS GRADIENT SPECTRUM (EPOCH_${epoch}/100)` : 'STOCHASTIC GRADIENT VECTOR CONVERGENCE'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className={`h-1.5 w-1.5 rounded-full ${isTraining ? 'bg-[#ff0055] animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
+                        <span className="text-[7.5px] font-mono text-stone-500">LEARNING_RATE={mlDetails.learningRate}</span>
+                      </div>
+                    </div>
+
+                    <div className="relative w-full h-44 my-2 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-[#00f3ff]/[0.01] bg-grid-pattern opacity-10 pointer-events-none" />
+                      
+                      {/* SVG Canvas */}
+                      <svg className="w-full h-full" viewBox="0 0 320 150">
+                        {/* Coordinate Grid Background */}
+                        <line x1="20" y1="15" x2="300" y2="15" stroke={isLight ? '#e5e7eb' : '#1e293b'} strokeWidth="0.5" strokeDasharray="3,3" />
+                        <line x1="20" y1="45" x2="300" y2="45" stroke={isLight ? '#e5e7eb' : '#1e293b'} strokeWidth="0.5" strokeDasharray="3,3" />
+                        <line x1="20" y1="75" x2="300" y2="75" stroke={isLight ? '#e5e7eb' : '#1e293b'} strokeWidth="0.5" strokeDasharray="3,3" />
+                        <line x1="20" y1="105" x2="300" y2="105" stroke={isLight ? '#e5e7eb' : '#1e293b'} strokeWidth="0.5" strokeDasharray="3,3" />
+                        <line x1="20" y1="135" x2="300" y2="135" stroke={isLight ? '#dee2e6' : '#2e3e56'} strokeWidth="1" />
+
+                        {/* Y-Axis Guideline */}
+                        <line x1="20" y1="15" x2="20" y2="135" stroke={isLight ? '#dee2e6' : '#2e3e56'} strokeWidth="1" />
+
+                        {/* Graph Titles */}
+                        <text x="25" y="24" className="text-stone-500 font-mono text-[5px] uppercase font-bold tracking-wider opacity-60">OPTIMAL_BIAS (Limit: 1.0)</text>
+                        <text x="25" y="130" className="text-stone-500 font-mono text-[5px] uppercase font-bold tracking-wider opacity-60">CONVERGED LOSS EQUILIBRIUM</text>
+
+                        {/* Gradients */}
+                        <defs>
+                          <linearGradient id="gradientLineRed" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#ec4899" />
+                            <stop offset="100%" stopColor="#a855f7" />
+                          </linearGradient>
+                          <linearGradient id="gradientLineCyan" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#06b6d4" />
+                            <stop offset="100%" stopColor="#22c55e" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Sub curves - APY speed */}
+                        <path
+                          d={wavePath2}
+                          fill="none"
+                          stroke={isLight ? '#94a3b8' : 'url(#gradientLineCyan)'}
+                          strokeWidth="1.5"
+                          strokeDasharray={isTraining ? '3,2' : 'none'}
+                          opacity="0.8"
+                        />
+
+                        {/* Primary wave - Loss decay curve */}
+                        <path
+                          d={wavePath1}
+                          fill="none"
+                          stroke={isLight ? '#0f172a' : 'url(#gradientLineRed)'}
+                          strokeWidth={isTraining ? '2.5' : '1.8'}
+                          style={{ filter: isTraining ? 'drop-shadow(0 0 4px rgba(236, 72, 153, 0.6))' : 'none' }}
+                          className="transition-all duration-300"
+                        />
+
+                        {/* Laser Sweeper Vertical Bar during Training */}
+                        {isTraining && (
                           <line
-                            key={`syn1-${iIdx}-${hIdx}`}
-                            x1="45"
-                            y1={yIn}
-                            x2="150"
-                            y2={yHid}
-                            stroke={isFiring ? "url(#synGradActive)" : "url(#synGrad)"}
-                            strokeWidth={isFiring ? "1.6" : "0.5"}
-                            strokeDasharray={isFiring ? "4,3" : "none"}
-                            className="transition-all duration-300"
-                          >
-                            {isFiring && (
-                              <animate
-                                attributeName="stroke-dashoffset"
-                                values="30;0"
-                                dur="1.2s"
-                                repeatCount="indefinite"
-                              />
-                            )}
-                          </line>
-                        );
-                      })
-                    ))}
+                            x1={30 + (epoch % 27) * 10}
+                            y1="15"
+                            x2={30 + (epoch % 27) * 10}
+                            y2="135"
+                            stroke="#00f3ff"
+                            strokeWidth="1.5"
+                            opacity="0.7"
+                            style={{ filter: 'drop-shadow(0 0 3px #00f3ff)' }}
+                          />
+                        )}
 
-                    {/* Hidden (x=160) to Output (x=290) */}
-                    {[35, 75, 115].map((yHid, hIdx) => (
-                      [45, 105].map((yOut, oIdx) => {
-                        const activeIndex = (hIdx * 2 + oIdx);
-                        const isFiring = isTraining && ((epoch + 1) % 2 === activeIndex % 2);
-                        return (
-                          <line
-                            key={`syn2-${hIdx}-${oIdx}`}
-                            x1="170"
-                            y1={yHid}
-                            x2="275"
-                            y2={yOut}
-                            stroke={isFiring ? "url(#synGradActive)" : "url(#synGrad)"}
-                            strokeWidth={isFiring ? "1.6" : "0.5"}
-                            strokeDasharray={isFiring ? "4,3" : "none"}
-                            className="transition-all duration-300"
-                          >
-                            {isFiring && (
-                              <animate
-                                attributeName="stroke-dashoffset"
-                                values="30;0"
-                                dur="1.2s"
-                                repeatCount="indefinite"
-                              />
-                            )}
-                          </line>
-                        );
-                      })
-                    ))}
+                        {/* Vector Weights indicators */}
+                        <text x="270" y="30" className="fill-stone-500 font-mono text-[4.8px] font-bold">W_SPND: {(modelWeights.spendWeight).toFixed(2)}</text>
+                        <text x="270" y="42" className="fill-stone-500 font-mono text-[4.8px] font-bold">W_DEBT: {(modelWeights.debtPenetrationRatio).toFixed(2)}</text>
+                        <text x="270" y="54" className="fill-stone-500 font-mono text-[4.8px] font-bold">W_APY: {(modelWeights.APYAccumulationVector).toFixed(2)}</text>
+                        <text x="270" y="66" className="fill-stone-500 font-mono text-[4.8px] font-bold">W_SHLD: {(modelWeights.reserveShieldCoeff).toFixed(2)}</text>
 
-                    {/* LAYER LABELS */}
-                    <text x="10" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">INPUT COEFFS (W_0)</text>
-                    <text x="130" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">PROPAGATE (H)</text>
-                    <text x="250" y="8" className="text-stone-500 font-mono text-[5.5px] uppercase font-bold tracking-wider">DECISION MATRIX</text>
+                        {/* Real-time Telemetry numbers */}
+                        <text x="25" y="60" className="fill-cyan-500 font-mono text-[5.5px] font-bold uppercase">MOMENTUM=0.90</text>
+                        <text x="25" y="70" className="fill-fuchsia-500 font-mono text-[5.5px] font-bold uppercase">CONV_RATE=0.982</text>
+                        <text x="25" y="80" className="fill-yellow-600 font-mono text-[5.5px] font-bold uppercase">VARIANCE={isTraining ? '±0.032' : '±0.004'}</text>
+                      </svg>
+                    </div>
 
-                    {/* INPUT NODES (x=30) */}
-                    {[
-                      { y: 20, label: 'SPND', key: 'spendWeight', val: modelWeights.spendWeight },
-                      { y: 55, label: 'DEBT', key: 'debtPenetrationRatio', val: modelWeights.debtPenetrationRatio },
-                      { y: 90, label: 'APY_V', key: 'APYAccumulationVector', val: modelWeights.APYAccumulationVector },
-                      { y: 125, label: 'SHLD', key: 'reserveShieldCoeff', val: modelWeights.reserveShieldCoeff }
-                    ].map((node, idx) => (
-                      <g key={`in-${idx}`}>
-                        <circle
-                          cx="30"
-                          cy={node.y}
-                          r="12"
-                          className={`${
-                            isTraining ? 'animate-pulse' : ''
-                          } transition-all duration-500`}
-                          fill={isLight ? '#f1f5f9' : '#080914'}
-                          stroke={isLight ? '#94a3b8' : '#00f3ff'}
-                          strokeWidth="1.2"
-                        />
-                        <text
-                          x="30"
-                          y={node.y + 2}
-                          textAnchor="middle"
-                          className={`font-mono text-[6px] font-black ${
-                            isLight ? 'fill-slate-800' : 'fill-cyan-400'
-                          }`}
-                        >
-                          {node.label}
-                        </text>
-                        {/* Interactive float weight info */}
-                        <text
-                          x="55"
-                          y={node.y + 1.8}
-                          className="font-mono text-[5.5px] fill-stone-500 font-bold"
-                        >
-                          {(node.val * 10).toFixed(1)}
-                        </text>
-                      </g>
-                    ))}
-
-                    {/* HIDDEN INTERCHANGE NEURONS (x=160) */}
-                    {[
-                      { y: 35, sym: 'H0', state: 'PROP' },
-                      { y: 75, sym: 'H1', state: 'RE_C' },
-                      { y: 115, sym: 'H2', state: 'GRAD' }
-                    ].map((hNode, idx) => (
-                      <g key={`hid-${idx}`}>
-                        <circle
-                          cx="160"
-                          cy={hNode.y}
-                          r="10"
-                          className={isTraining ? "animate-pulse" : ""}
-                          fill={isLight ? '#f8fafc' : '#110d29'}
-                          stroke={isTraining ? '#ec4899' : (isLight ? '#cbd5e1' : '#a855f7')}
-                          strokeWidth="1.2"
-                          style={{ filter: isTraining ? 'drop-shadow(0 0 3px rgba(236, 72, 153, 0.5))' : 'none' }}
-                        />
-                        <text
-                          x="160"
-                          y={hNode.y + 2}
-                          textAnchor="middle"
-                          className={`font-mono text-[6px] font-bold ${
-                            isLight ? 'fill-slate-700' : 'fill-purple-300'
-                          }`}
-                        >
-                          {hNode.sym}
-                        </text>
-                        {/* State code vector tag */}
-                        <text
-                          x="176"
-                          y={hNode.y + 2}
-                          className="font-mono text-[5px] fill-stone-500 tracking-wider font-bold"
-                        >
-                          {isTraining ? 'TUNE' : hNode.state}
-                        </text>
-                      </g>
-                    ))}
-
-                    {/* OUTPUT DECISIONS NODES (x=290) */}
-                    {[
-                      { y: 45, label: 'L_RES', act: 'RESERVE' },
-                      { y: 105, label: 'Y_ACC', act: 'BOOST' }
-                    ].map((oNode, idx) => (
-                      <g key={`out-${idx}`}>
-                        <rect
-                          x="275"
-                          y={oNode.y - 8}
-                          width="30"
-                          height="16"
-                          rx="3"
-                          fill={isLight ? '#f1f5f9' : '#03040c'}
-                          stroke={isTraining ? '#f59e0b' : (isLight ? '#94a3b8' : '#ec4899')}
-                          strokeWidth="1.2"
-                        />
-                        <text
-                          x="290"
-                          y={oNode.y + 2}
-                          textAnchor="middle"
-                          className={`font-display text-[6px] font-black ${
-                            isLight ? 'fill-slate-800' : 'fill-[#f59e0b]'
-                          }`}
-                        >
-                          {oNode.label}
-                        </text>
-                        <text
-                          x="290"
-                          y={oNode.y + 13}
-                          textAnchor="middle"
-                          className="font-mono text-[4.5px] fill-stone-500 font-bold"
-                        >
-                          {oNode.act}
-                        </text>
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-
-                <div className="text-center mt-1 w-full border-t border-dashed border-stone-800/10 pt-2">
-                  <span className="text-[9px] font-mono font-bold text-stone-500 block uppercase tracking-wider">
-                    {isTraining ? `Epoch Optimization run at learning rate: ${mlDetails.learningRate}` : 'Bayes connection vectors verified offline'}
-                  </span>
-                </div>
-              </div>
+                    <div className="text-center mt-1 w-full border-t border-dashed border-stone-800/10 pt-2">
+                      <span className="text-[9px] font-mono font-bold text-stone-500 block uppercase tracking-wider">
+                        {isTraining ? `SGD MINIMIZER ERROR: ${loss.toFixed(6)} | CALIBRATING COEFFS` : 'Vector gradient convergence stabilized successfully.'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
 

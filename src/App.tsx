@@ -257,92 +257,32 @@ export default function App() {
   };
 
   const getSmartPredictiveSmsDetails = (rawText: string) => {
-    const textLower = rawText.toLowerCase();
+    if (!vaultData) {
+      return {
+        parsedAmt: 1200,
+        parsedCategory: 'Shopping',
+        parsedAssetId: '',
+        parsedAssetName: 'Liquid Assets Portfolio',
+        merchant: 'Retail Outlet'
+      };
+    }
     
-    // Parse amount using regex
-    const amtRegex = /(?:rs\.?|inr|₹|inr\.)\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*(?:inr|rupees|rs|spent|debited)/i;
-    const isAmtMatch = rawText.match(amtRegex);
-    let parsedAmountValue = 0;
-    if (isAmtMatch) {
-      const matchGroup = isAmtMatch[1] || isAmtMatch[2];
-      if (matchGroup) {
-        parsedAmountValue = parseFloat(matchGroup.replace(/,/g, ''));
-      }
-    }
+    // Obtain dynamic list of active categories in user ledger
+    const expenseCategories = (vaultData.expenses || []).map(e => e.category);
+    const uniqueCats = Array.from(new Set([
+      ...expenseCategories,
+      'Dining', 'Transport', 'Entertainment', 'Medical', 'Groceries', 'Shopping', 'Rent', 'Investment', 'Cash'
+    ]));
 
-    // Default category matching
-    let predCategory = 'Shopping';
-    if (textLower.includes('food') || textLower.includes('dining') || textLower.includes('swiggy') || textLower.includes('zomato') || textLower.includes('hotel') || textLower.includes('cafe')) {
-      predCategory = 'Dining';
-    } else if (textLower.includes('uber') || textLower.includes('ola') || textLower.includes('fuel') || textLower.includes('petrol') || textLower.includes('metro') || textLower.includes('cab')) {
-      predCategory = 'Transport';
-    } else if (textLower.includes('movie') || textLower.includes('netflix') || textLower.includes('spotify') || textLower.includes('game') || textLower.includes('entertainment')) {
-      predCategory = 'Entertainment';
-    } else if (textLower.includes('medicine') || textLower.includes('hospital') || textLower.includes('doctor') || textLower.includes('pharmacy')) {
-      predCategory = 'Medical';
-    } else if (textLower.includes('grocery') || textLower.includes('dmart') || textLower.includes('blinkit') || textLower.includes('market') || textLower.includes('groceries')) {
-      predCategory = 'Groceries';
-    } else if (textLower.includes('rent') || textLower.includes('apartment') || textLower.includes('lease') || textLower.includes('repayment')) {
-      predCategory = 'Rent';
-    }
-
-    // Match past expenses! This is using previous knowledge!!
-    if (vaultData && vaultData.expenses) {
-      const words = textLower.split(/[^a-z0-9]+/).filter(w => w.length >= 3);
-      const matchedExpense = vaultData.expenses.find(exp => {
-        if (!exp.notes) return false;
-        const notesLower = exp.notes.toLowerCase();
-        return words.some(w => notesLower.includes(w));
-      });
-      if (matchedExpense) {
-        predCategory = matchedExpense.category;
-      }
-    }
-
-    // Match bank / asset accounts from Echelon
-    let matchedAssetId = '';
-    let matchedAssetName = 'Liquid Assets Portfolio';
-    if (vaultData && vaultData.assets) {
-      const bankAsset = vaultData.assets.find(a => {
-        const aName = a.name.toLowerCase();
-        const inst = a.institution.toLowerCase();
-        if (textLower.includes('hdfc') && (aName.includes('hdfc') || inst.includes('hdfc'))) return true;
-        if (textLower.includes('sbi') && (aName.includes('sbi') || inst.includes('sbi'))) return true;
-        if (textLower.includes('icici') && (aName.includes('icici') || inst.includes('icici'))) return true;
-        if (textLower.includes('axis') && (aName.includes('axis') || inst.includes('axis'))) return true;
-        return false;
-      });
-      if (bankAsset) {
-        matchedAssetId = bankAsset.id;
-        matchedAssetName = bankAsset.name;
-      } else {
-        const activeBank = vaultData.assets.find(a => a.type === 'BANK_BALANCE');
-        if (activeBank) {
-          matchedAssetId = activeBank.id;
-          matchedAssetName = activeBank.name;
-        }
-      }
-    }
-
-    // Merchant name extraction
-    let merchantName = 'Shopping Spend';
-    if (textLower.includes('at ')) {
-      const parts = rawText.split(/at\s+/i);
-      if (parts.length > 1) merchantName = parts[1].split(/[.\s]/)[0] + ' ' + (parts[1].split(/[.\s]/)[1] || '');
-    } else if (textLower.includes('on ')) {
-      const parts = rawText.split(/on\s+/i);
-      if (parts.length > 1) merchantName = parts[1].split(/[.\s]/)[0];
-    } else if (textLower.includes('for ')) {
-      const parts = rawText.split(/for\s+/i);
-      if (parts.length > 1) merchantName = parts[1].split(/[.\s]/)[0] + ' ' + (parts[1].split(/[.\s]/)[1] || '');
-    }
+    // Execute in-context Naive Bayes Bayesian / TF-IDF classifier on local device memory!
+    const result = sovereignML.predict(rawText, vaultData.assets || [], uniqueCats);
 
     return {
-      parsedAmt: parsedAmountValue,
-      parsedCategory: predCategory,
-      parsedAssetId: matchedAssetId,
-      parsedAssetName: matchedAssetName,
-      merchant: merchantName.trim() || 'Retail Outlet'
+      parsedAmt: result.parsedAmt,
+      parsedCategory: result.parsedCategory,
+      parsedAssetId: result.parsedAssetId,
+      parsedAssetName: result.parsedAssetName,
+      merchant: result.merchant
     };
   };
 
@@ -1691,13 +1631,25 @@ export default function App() {
       
       const thresholdAmt = rule.targetAmount || 0;
       const thresholdPct = rule.targetPercent || 0;
+
+      // Calculate dynamic average transaction amount for the ML behavior check
+      const currentSpendAverage = (vaultData.expenses || []).reduce((sum, e) => sum + e.amount, 0) / Math.max(1, (vaultData.expenses || []).length);
+      const targetThresholdVal = rule.conditionType.includes('amount') ? thresholdAmt : (thresholdPct * netWorthSum / 100);
+
+      // Trigger automatic ML severity categorization based on user's behavioral attention memory
+      const severity = sovereignML.autoCategorizeAlertSeverity(
+        rule.name, 
+        vaultData.acknowledgedAlerts || [], 
+        currentSpendAverage, 
+        targetThresholdVal
+      );
       
       if (rule.conditionType === 'below_amount') {
         if (combinedValue < thresholdAmt) {
           triggered.push({
             rule,
             message: `[${namesJoined}] balance is short of target by ${vaultData.currencySymbol || '₹'}${Math.floor(thresholdAmt - combinedValue).toLocaleString()}.`,
-            severity: 'warning'
+            severity
           });
         }
       } else if (rule.conditionType === 'above_amount') {
@@ -1705,7 +1657,7 @@ export default function App() {
           triggered.push({
             rule,
             message: `[${namesJoined}] balance reached target of ${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()}.`,
-            severity: 'info'
+            severity
           });
         }
       } else if (rule.conditionType === 'below_percent') {
@@ -1714,7 +1666,7 @@ export default function App() {
           triggered.push({
             rule,
             message: `[${namesJoined}] allocation weight is under target of ${thresholdPct}%.`,
-            severity: 'warning'
+            severity
           });
         }
       } else if (rule.conditionType === 'above_percent') {
@@ -1723,7 +1675,7 @@ export default function App() {
           triggered.push({
             rule,
             message: `[${namesJoined}] concentration is above ceiling limit of ${thresholdPct}%.`,
-            severity: 'warning'
+            severity
           });
         }
       }
@@ -2053,7 +2005,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
         
         {/* 2. DYNAMIC WORKSPACE PAGES */}
-        <div className="animate-fade-in pb-36">
+        <div className="animate-fade-in pb-20 sm:pb-32">
           
           {activeTab === 'portfolio' && (
             <div className="space-y-8">
@@ -2193,60 +2145,60 @@ export default function App() {
       </main>
 
       {/* SECURE HIGH-CONTRAST BOTTOM NAVIGATION TASKBAR */}
-      <div className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t px-2 py-3 flex items-center justify-around max-w-lg mx-auto sm:rounded-t-3xl sm:border shadow-2xl transition-all duration-300 ${tokens.card}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t px-2 py-1.5 sm:py-2.5 flex items-center justify-around max-w-lg mx-auto rounded-t-xl sm:rounded-t-3xl sm:border shadow-2xl transition-all duration-300 pb-safe ${tokens.card}`}>
         <button
           type="button"
           onClick={() => setActiveTab('portfolio')}
-          className={`flex flex-col items-center gap-1.5 py-1 px-3.5 rounded-2xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 sm:py-1 sm:px-3.5 rounded-2xl transition-all ${
             activeTab === 'portfolio' ? 'text-amber-500 bg-amber-500/10 font-black' : `${tokens.textSecondary} opacity-70 hover:opacity-100 hover:text-amber-400`
           }`}
         >
-          <Coins className="h-5 w-5" />
-          <span className="text-[9px] uppercase tracking-wider font-mono font-bold">Portfolio</span>
+          <Coins className="h-4.5 w-4.5 sm:h-5 w-5" />
+          <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-wider font-mono font-bold">Portfolio</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('assets')}
-          className={`flex flex-col items-center gap-1.5 py-1 px-3.5 rounded-2xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 sm:py-1 sm:px-3.5 rounded-2xl transition-all ${
             activeTab === 'assets' ? 'text-amber-500 bg-amber-500/10 font-black' : `${tokens.textSecondary} opacity-70 hover:opacity-100 hover:text-amber-400`
           }`}
         >
-          <Compass className="h-5 w-5" />
-          <span className="text-[9px] uppercase tracking-wider font-mono font-bold">Assets</span>
+          <Compass className="h-4.5 w-4.5 sm:h-5 w-5" />
+          <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-wider font-mono font-bold">Assets</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('loans')}
-          className={`flex flex-col items-center gap-1.5 py-1 px-3.5 rounded-2xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 sm:py-1 sm:px-3.5 rounded-2xl transition-all ${
             activeTab === 'loans' ? 'text-amber-500 bg-amber-500/10 font-black' : `${tokens.textSecondary} opacity-70 hover:opacity-100 hover:text-amber-400`
           }`}
         >
-          <Activity className="h-5 w-5" />
-          <span className="text-[9px] uppercase tracking-wider font-mono font-bold">Debts</span>
+          <Activity className="h-4.5 w-4.5 sm:h-5 w-5" />
+          <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-wider font-mono font-bold">Debts</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('budget')}
-          className={`flex flex-col items-center gap-1.5 py-1 px-3.5 rounded-2xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 sm:py-1 sm:px-3.5 rounded-2xl transition-all ${
             activeTab === 'budget' ? 'text-amber-500 bg-amber-500/10 font-black' : `${tokens.textSecondary} opacity-70 hover:opacity-100 hover:text-amber-400`
           }`}
         >
-          <Wallet className="h-5 w-5" />
-          <span className="text-[9px] uppercase tracking-wider font-mono font-bold">Budget</span>
+          <Wallet className="h-4.5 w-4.5 sm:h-5 w-5" />
+          <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-wider font-mono font-bold">Budget</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center gap-1.5 py-1 px-3.5 rounded-2xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 sm:py-1 sm:px-3.5 rounded-2xl transition-all ${
             activeTab === 'ai' ? 'text-amber-500 bg-amber-500/10 font-black' : `${tokens.textSecondary} opacity-70 hover:opacity-100 hover:text-amber-400`
           }`}
         >
-          <Sparkles className="h-5 w-5" />
-          <span className="text-[9px] uppercase tracking-wider font-mono font-bold">AI Insights</span>
+          <Sparkles className="h-4.5 w-4.5 sm:h-5 w-5" />
+          <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-wider font-mono font-bold">AI Insights</span>
         </button>
       </div>
 
