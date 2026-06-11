@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldCheck, 
+  Shield,
   Lock, 
   Wallet, 
   Sparkles, 
@@ -69,7 +70,7 @@ import EchelonOnboardingScreen from './components/EchelonOnboardingScreen';
 
 // Utilities
 import { encryptData, decryptData, hashPin } from './utils/security';
-import { getColorTokens } from './utils/theme';
+import { getColorTokens, isThemeLight } from './utils/theme';
 import { calculateLoanCurrentBalance, calculateWealthRates, calculateCreditCardEffectiveLiability } from './utils/math';
 import { generateCSVData, generateHTMLReport, downloadBlob } from './utils/export';
 import { sovereignML } from './utils/predictiveModel';
@@ -197,6 +198,7 @@ export default function App() {
   }>>([]);
 
   const [showOpeningSmsVerify, setShowOpeningSmsVerify] = useState<boolean>(true);
+  const [showLoginSmsConsent, setShowLoginSmsConsent] = useState<boolean>(false);
 
   const runSmsPrediction = async (smsId: string, rawText: string) => {
     try {
@@ -292,96 +294,119 @@ export default function App() {
       if (type === 'tick') {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(2400, audioCtx.currentTime); 
-        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.045);
-        gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.045);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.045);
-      } else if (type === 'success') {
-        const now = audioCtx.currentTime;
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + i * 0.07);
-          gain.gain.setValueAtTime(0.035, now + i * 0.07);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.25);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + i * 0.07);
-          osc.stop(now + i * 0.07 + 0.26);
-        });
-      } else if (type === 'notify') {
-        // Deep suspense cinematic alert swell
-        const osc = audioCtx.createOscillator();
-        const oscSub = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(260, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(130, audioCtx.currentTime + 0.65);
-        
-        oscSub.type = 'sine';
-        oscSub.frequency.setValueAtTime(65, audioCtx.currentTime);
-        oscSub.frequency.linearRampToValueAtTime(52, audioCtx.currentTime + 0.65);
-        
         const filter = audioCtx.createBiquadFilter();
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5 warm wood-pluck
+        osc.frequency.exponentialRampToValueAtTime(329.63, audioCtx.currentTime + 0.09); // downward roll
+        
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(320, audioCtx.currentTime);
-        
-        gain.gain.setValueAtTime(0.045, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.65);
-        
+        filter.frequency.setValueAtTime(900, audioCtx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(450, audioCtx.currentTime + 0.09);
+
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.09);
+
         osc.connect(filter);
-        oscSub.connect(filter);
         filter.connect(gain);
         gain.connect(audioCtx.destination);
         
         osc.start();
-        oscSub.start();
-        osc.stop(audioCtx.currentTime + 0.66);
-        oscSub.stop(audioCtx.currentTime + 0.66);
+        osc.stop(audioCtx.currentTime + 0.09);
+      } else if (type === 'success') {
+        const now = audioCtx.currentTime;
+        const freqs = [329.63, 415.30, 493.88, 587.33, 739.99]; // Luxurious EMaj9 sweeping arpeggio
+        freqs.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const filter = audioCtx.createBiquadFilter();
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.04);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1200, now + i * 0.04);
+          
+          gain.gain.setValueAtTime(0.0, now + i * 0.04);
+          gain.gain.linearRampToValueAtTime(0.03, now + i * 0.04 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.04 + 0.38);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          
+          osc.start(now + i * 0.04);
+          osc.stop(now + i * 0.04 + 0.4);
+        });
+      } else if (type === 'notify') {
+        const now = audioCtx.currentTime;
+        const notes = [440.00, 554.37, 659.25]; // Smooth A major ambient bell chime
+        notes.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const filter = audioCtx.createBiquadFilter();
+          
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(800, now);
+          
+          gain.gain.setValueAtTime(0.0, now);
+          gain.gain.linearRampToValueAtTime(0.015, now + 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 0.6);
+        });
       } else if (type === 'cyber') {
-        const osc1 = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc1.type = 'triangle';
-        osc1.frequency.setValueAtTime(75, audioCtx.currentTime);
-        osc1.frequency.linearRampToValueAtTime(250, audioCtx.currentTime + 1.25);
-        
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(112.5, audioCtx.currentTime);
-        osc2.frequency.linearRampToValueAtTime(375, audioCtx.currentTime + 1.25);
-        
-        gain.gain.setValueAtTime(0.008, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.045, audioCtx.currentTime + 0.3);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.25);
-        
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        osc1.start();
-        osc2.start();
-        osc1.stop(audioCtx.currentTime + 1.26);
-        osc2.stop(audioCtx.currentTime + 1.26);
+        const now = audioCtx.currentTime;
+        const freqs = [110.00, 220.00, 329.63, 440.00]; // Deep cozy lofi pad/sub chime
+        freqs.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const filter = audioCtx.createBiquadFilter();
+          
+          osc.type = i === 0 ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(500, now);
+          
+          gain.gain.setValueAtTime(0.0, now);
+          gain.gain.linearRampToValueAtTime(0.025, now + 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          
+          osc.start(now);
+          osc.stop(now + 1.15);
+        });
       } else if (type === 'error') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(120, audioCtx.currentTime); 
-        osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.35);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.35);
+        const now = audioCtx.currentTime;
+        const freqs = [293.66, 277.18]; // Double soft minor third decay (non-jarring)
+        freqs.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.08);
+          
+          gain.gain.setValueAtTime(0.03, now + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.25);
+          
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.27);
+        });
       }
     } catch (_) {}
   };
@@ -667,6 +692,7 @@ export default function App() {
           setVaultData(parsedData);
           setActivePin(pin);
           setIsLocked(false);
+          setShowLoginSmsConsent(true);
           
           // Sync public icon unencrypted so they appear on Login Screen instantly
           const icon = parsedData.selectedGalleryIcon || 'stealth-matte-gold';
@@ -697,6 +723,7 @@ export default function App() {
         setVaultData(defaults);
         setActivePin(pin);
         setIsLocked(false);
+        setShowLoginSmsConsent(true);
         return true;
       }
     }
@@ -721,6 +748,7 @@ export default function App() {
     setVaultData(initialConfig);
     setActivePin(newPin);
     setIsLocked(false);
+    setShowLoginSmsConsent(true);
   };
 
   // Helper routine to save updated state payload back into offline encrypter
@@ -1660,16 +1688,37 @@ export default function App() {
     
     const triggered: { rule: AlertRule; message: string; severity: 'warning' | 'info' }[] = [];
     const netWorthSum = totalNetWorth;
+
+    // ML Cognitive Theme Advisory - adaptive styling evaluation
+    if (vaultData.theme) {
+      const activeRates = calculateWealthRates(vaultData.assets, vaultData.loans, vaultData.monthlyEarnings, vaultData.expenses, netWorthSum);
+      const blendedAPY = activeRates.earningsRatePercentOfYear;
+      const themeAnalysis = sovereignML.analyzeThemeChoice(
+        vaultData.theme.palette,
+        isThemeLight(vaultData.theme),
+        netWorthSum,
+        blendedAPY
+      );
+      if (themeAnalysis.score < 90) {
+        triggered.push({
+          rule: {
+            id: 'system-ml-theme-advisory',
+            name: '🤖 ML COGNITIVE THEME STABILIZER',
+            assetIds: [],
+            isActive: true,
+            conditionType: 'below_amount'
+          },
+          message: `${themeAnalysis.description} Recommended Palette: [${themeAnalysis.recommendation.toUpperCase()}]. Turn to the AI Insights tab to auto-tune.`,
+          severity: 'info'
+        });
+      }
+    }
     
     vaultData.structuredAlertRules.forEach(rule => {
       if (!rule.isActive) return;
 
       if (rule.id.startsWith('system-insight-')) {
-        triggered.push({
-          rule,
-          message: `Tax yield and safety adjustments synced.`,
-          severity: 'info'
-        });
+        // Skip noisy and non-critical automated system notifications to keep user focus on serious items
         return;
       }
       
@@ -1848,7 +1897,7 @@ export default function App() {
 
   // Active theme parameters
   const tokens = getColorTokens(vaultData.theme);
-  const isLight = vaultData.theme.mode === 'light';
+  const isLight = isThemeLight(vaultData.theme);
   const activeColor = vaultData.activeAccentColor || '#f59e0b';
   const activeCustomTheme = vaultData && vaultData.theme.palette.startsWith('custom-')
     ? (vaultData.customThemeConfigs || []).find(c => `custom-${c.id}` === vaultData.theme.palette)
@@ -2190,6 +2239,7 @@ export default function App() {
               soundEnabledExternal={soundEnabled}
               smsPermissionStateExternal={smsPermissionState}
               onUpdateSmsPermission={handleUpdateSmsPermission}
+              onChangeTheme={handleChangeTheme}
             />
           )}
 
@@ -2259,42 +2309,42 @@ export default function App() {
 
       {/* DYNAMIC SETTINGS VAULT DRAWER MODAL OVERLAY */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className={`w-full max-w-2xl ${tokens.card} border ${tokens.border} rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl ${tokens.textPrimary} max-h-[90vh] overflow-y-auto`}>
+        <div className="fixed inset-0 z-50 overflow-hidden bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className={`w-full max-w-2xl ${tokens.card} border ${tokens.border} rounded-3xl flex flex-col shadow-2xl ${tokens.textPrimary} max-h-[calc(100vh-2rem)] sm:max-h-[85vh]`}>
             
             {/* Modal Header */}
-            <div className={`flex items-center justify-between border-b ${tokens.border} pb-4`}>
+            <div className={`p-5 sm:p-6 pb-4 flex items-center justify-between border-b ${tokens.border} shrink-0`}>
               <div>
-                <h2 className={`text-xl font-bold ${tokens.textPrimary} flex items-center gap-2`}>
+                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                   <Sliders className="h-5 w-5 text-amber-500 animate-pulse" />
                   <span>Echelon Vault Customizations</span>
                 </h2>
-                <p className="text-xs text-stone-500">Configure visual themes, custom parameters, backups and app galleries</p>
+                <p className="text-[10px] sm:text-xs text-stone-500">Configure visual themes, custom parameters, backups and app galleries</p>
               </div>
-              <div className="flex items-center gap-2 mr-8 md:mr-10">
+              <div className="flex items-center gap-1.5 sm:gap-2 mr-2">
                 <button
                   type="button"
                   id="export-pdf-top-btn"
                   onClick={() => setSettingsTab('backups')}
-                  className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-stone-300 border border-stone-750 hover:text-amber-500 rounded-xl text-xs font-semibold transition-all font-mono flex items-center gap-1.5"
+                  className="px-2.5 py-1 bg-zinc-850 hover:bg-zinc-800 text-stone-300 border border-stone-800 hover:text-amber-500 rounded-lg text-[10px] font-bold transition-all font-mono flex items-center gap-1 leading-none h-7 whitespace-nowrap"
                   title="Navigate to Settings Downloads"
                 >
-                  <Download className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <Download className="h-3 w-3 text-amber-500 shrink-0" />
                   <span>Download</span>
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => setShowSettings(false)}
-                className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-stone-950 transition-all font-bold"
+                className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-stone-950 transition-all font-bold h-7 w-7 flex items-center justify-center"
                 title="Dismiss Configurations"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
             {/* Seamless Sub-tab Navigators */}
-            <div className="flex border-b border-stone-800 overflow-x-auto gap-2 pb-1.5 scrollbar-none">
+            <div className="px-5 sm:px-6 py-2 border-b border-stone-800 flex overflow-x-auto gap-1.5 pb-2 scrollbar-none shrink-0 bg-stone-500/5">
               {[
                 { id: 'profile', label: 'User Profile & Base' },
                 { id: 'themes', label: 'Theme Configs' },
@@ -2308,10 +2358,10 @@ export default function App() {
                     key={t.id}
                     type="button"
                     onClick={() => setSettingsTab(t.id as any)}
-                    className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded-lg transition-all shrink-0 ${
+                    className={`px-2.5 py-1.5 text-[9px] sm:text-[10px] font-mono font-bold uppercase rounded-lg transition-all shrink-0 ${
                       isActive 
                         ? 'bg-amber-500 text-zinc-950 font-black shadow-md' 
-                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/50'
+                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
                     }`}
                   >
                     {t.label}
@@ -2319,6 +2369,9 @@ export default function App() {
                 );
               })}
             </div>
+
+            {/* Tab content wrapped in a responsive scrollable body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-stone-800">
 
             {/* SUB-TAB A: PROFILE & GENERAL LEDGER BASE */}
             {settingsTab === 'profile' && (
@@ -3545,20 +3598,22 @@ export default function App() {
                         Export your comprehensive quiet wealth reports, spreadsheets, and secure schema file to store your records locally.
                       </p>
                     </div>
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={handleExportPDF}
-                        className="px-3 py-1.5 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs rounded-lg transition-all"
+                        className="px-2 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-[11px] rounded-lg transition-all truncate text-center"
+                        title="Download Printable Assessment Statement"
                       >
-                        Download Printable Assessment Statement (HTML)
+                        PDF/HTML Report
                       </button>
                       <button
                         type="button"
                         onClick={handleExportCSV}
-                        className="px-3 py-1.5 w-full bg-zinc-800 hover:bg-zinc-750 text-stone-200 font-semibold text-xs rounded-lg border border-stone-750 transition-all"
+                        className="px-2 py-1.5 bg-zinc-850 hover:bg-zinc-800 text-stone-200 font-semibold text-[11px] rounded-lg border border-stone-750 transition-all truncate text-center"
+                        title="Download Portfolio Statement (CSV)"
                       >
-                        Download Portfolio Statement (CSV)
+                        Export CSV Sheet
                       </button>
                       <button
                         type="button"
@@ -3575,9 +3630,10 @@ export default function App() {
                           setDownloadModalContent(jsonStr);
                           setDownloadModalOpen(true);
                         }}
-                        className="px-3 py-1.5 w-full bg-zinc-850 hover:bg-zinc-805 text-stone-300 font-medium text-xs rounded-lg border border-stone-800 transition-all"
+                        className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-850 text-stone-300 font-medium text-[11px] rounded-lg border border-stone-800 transition-all truncate text-center"
+                        title="Download Backup JSON Database"
                       >
-                        Download Backup JSON Database
+                        Backup Database
                       </button>
                       <button
                         type="button"
@@ -3585,9 +3641,10 @@ export default function App() {
                           const stateStr = JSON.stringify(vaultData, null, 2);
                           handleCopyToClipboard(stateStr);
                         }}
-                        className="px-3 py-1.5 w-full bg-zinc-900/60 hover:bg-zinc-850 text-stone-400 text-[10.5px] font-medium rounded-lg transition-all"
+                        className="px-2 py-1.5 bg-zinc-950 hover:bg-zinc-900 text-stone-400 text-[11px] font-medium rounded-lg border border-stone-900 transition-all truncate text-center"
+                        title="Copy Raw treasure payload to clipboard"
                       >
-                        Copy Raw JSON String
+                        Copy JSON String
                       </button>
                     </div>
                   </div>
@@ -3689,6 +3746,7 @@ export default function App() {
               </div>
             )}
 
+            </div> {/* Close responsive scrollable tab body */}
           </div>
         </div>
       )}
@@ -3764,6 +3822,62 @@ export default function App() {
               <pre className="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-all">
                 {downloadModalContent}
               </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLoginSmsConsent && vaultData && (
+        <div id="login-sms-consent-overlay" className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="w-full max-w-md p-6 rounded-3xl border border-pink-500/30 bg-[#0c0d1e] text-center space-y-5 shadow-2xl relative">
+            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-pink-500 to-transparent animate-pulse" />
+            
+            <div className="h-12 w-12 mx-auto bg-pink-950/40 border border-pink-500/40 rounded-2xl flex items-center justify-center p-1.5 shadow-[0_0_15px_rgba(236,72,153,0.3)] shrink-0">
+              <Shield className="h-6 w-6 text-pink-500 animate-pulse" />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-pink-500 font-mono font-bold block">SECURE DEVICE DECK</span>
+              <h2 className="text-base font-black text-white leading-snug">Confirm SMS Reading System Access</h2>
+              <p className="text-xs text-stone-350 leading-normal pt-2 font-mono">
+                Echelon Vault triggers the secure on-device SMS parser upon entry to automatically organize transaction alerts from standard banking feeds (HDFC, SBI, ICICI, card alerts) with predictive class accuracy.
+              </p>
+            </div>
+
+            <div className="bg-stone-950/60 p-3.5 rounded-2xl border border-pink-500/10 text-left space-y-1.5 font-mono text-[10.5px]">
+              <span className="text-[9px] font-black text-[#00f3ff] uppercase block">🔒 OFFLINE COGNITIVE PRIVACY:</span>
+              <p className="text-[10px] text-zinc-400 leading-tight">
+                All parsing processes run entirely offline in local micro-memory. Absolutely zero message texts or credentials transcend this sandboxed browser session.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                id="login-sms-grant"
+                onClick={() => {
+                  setSmsPermissionState('granted');
+                  localStorage.setItem('echelon_sms_telemetry', 'granted');
+                  setShowLoginSmsConsent(false);
+                  playSystemSound('success');
+                }}
+                className="flex-1 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold font-mono uppercase text-[10px] rounded-xl tracking-wider hover:scale-102 active:scale-98 transition-all cursor-pointer shadow-[0_0_12px_rgba(236,72,153,0.3)] text-center"
+              >
+                Accept & Enable Feature
+              </button>
+              <button
+                type="button"
+                id="login-sms-decline"
+                onClick={() => {
+                  setSmsPermissionState('denied');
+                  localStorage.setItem('echelon_sms_telemetry', 'denied');
+                  setShowLoginSmsConsent(false);
+                  playSystemSound('tick');
+                }}
+                className="py-2.5 px-4 border border-zinc-800 text-stone-400 hover:text-stone-200 text-[10px] font-mono rounded-xl transition-all cursor-pointer hover:bg-stone-900/30"
+              >
+                Not Now
+              </button>
             </div>
           </div>
         </div>

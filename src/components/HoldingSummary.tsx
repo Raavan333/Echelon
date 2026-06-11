@@ -24,7 +24,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { EchelonTheme, Asset, Loan, LoanType, Expense } from '../types';
-import { getColorTokens } from '../utils/theme';
+import { getColorTokens, isThemeLight } from '../utils/theme';
 import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
 
 interface HoldingSummaryProps {
@@ -74,7 +74,7 @@ function SpeedometerDial({
   const clampedRate = Math.min(maxRate, Math.max(0, rate));
   const angle = (clampedRate / maxRate) * 180 - 180; // Angle from -180 to 0 degrees for semidial
 
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
 
   const colorConfig = {
     cyan: { 
@@ -218,7 +218,7 @@ export default function HoldingSummary({
     : (taggedBufferAssetId ? [taggedBufferAssetId] : []);
 
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
 
   // Totals calculations
   const totalAssetsVal = assets.reduce((sum, a) => sum + (a.isUSAsset ? a.currentValue * usdConversionRate : a.currentValue), 0);

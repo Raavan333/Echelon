@@ -16,10 +16,11 @@ import {
   X,
   Volume2,
   VolumeX,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
 import { EchelonTheme, Asset, Loan, LoanType, Expense, FinancialGoal, BudgetCategoryLimit } from '../types';
-import { getColorTokens } from '../utils/theme';
+import { getColorTokens, isThemeLight } from '../utils/theme';
 import { calculateWealthRates, calculateLoanCurrentBalance } from '../utils/math';
 import { sovereignML } from '../utils/predictiveModel';
 
@@ -41,6 +42,7 @@ interface AIInsightsProps {
   soundEnabledExternal?: boolean;
   smsPermissionStateExternal?: 'denied' | 'prompt' | 'granted';
   onUpdateSmsPermission?: (state: 'denied' | 'prompt' | 'granted') => void;
+  onChangeTheme?: (theme: EchelonTheme) => void;
 }
 
 // Retro-alien cyber-tech sound synthesizers using Web Audio API
@@ -232,10 +234,11 @@ export default function AIInsights({
   onAddExpense,
   soundEnabledExternal,
   smsPermissionStateExternal,
-  onUpdateSmsPermission
+  onUpdateSmsPermission,
+  onChangeTheme
 }: AIInsightsProps) {
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
   const neuralColors = getThemeNeuralColor(theme);
   const highlightText = isLight ? tokens.accentText : 'text-[#00f3ff]';
   const subLabelText = isLight ? 'text-stone-500 font-bold' : 'text-[#00f3ff]/60 font-bold';
@@ -373,6 +376,13 @@ export default function AIInsights({
   const highInterestDebts = loans.filter(l => l.type === LoanType.BORROWED && l.interestRate > blendedAPY);
   const netWorth = totalAssetsVal + totalLentVal - totalBorrowedVal;
   const rates = calculateWealthRates(assets, loans, monthlyEarnings, expenses, netWorth);
+  
+  const themeAnalysis = sovereignML.analyzeThemeChoice(
+    theme.palette,
+    isLight,
+    netWorth,
+    blendedAPY
+  );
 
   const liquidCash = assets
     .filter(a => a.type === 'BANK_BALANCE' || a.type === 'FD')
@@ -1170,7 +1180,7 @@ export default function AIInsights({
             `}</style>
             
             {/* LEFT SIDE: DECISION VECTOR COEFFICIENTS & NEURAL CORE */}
-            <div className={`p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group transition-all duration-300 ${leftPanelTrainingClass}`}>
+            <div className={`lg:col-span-6 p-6 rounded-2xl border flex flex-col justify-between relative overflow-hidden group transition-all duration-300 ${leftPanelTrainingClass}`}>
               {isTraining && (
                 <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-35 z-10">
                   <div className="w-full h-full bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03))] bg-[size:100%_4px,3px_100%] animate-pulse" />
@@ -1406,6 +1416,73 @@ export default function AIInsights({
                 {isTraining ? `SGD ERROR DEVIATION LOWERED (${((1 - loss) * 100).toFixed(1)}%)` : 'OVERCLOCK MANUAL TRAINING'}
               </button>
             </div>
+
+            {/* ML COGNITIVE THEME STABILIZER INTERACTIVE SUB-SYSTEM */}
+            <div className={`mt-6 p-4 rounded-xl border transition-all duration-300 ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-[#0b0c16] border-cyan-500/20'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`p-1.5 rounded-lg ${isLight ? 'bg-amber-100 text-amber-700' : 'bg-cyan-500/10 text-[#00f3ff]'}`}>
+                  <Cpu className="h-4 w-4 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-stone-800' : 'text-cyan-400'}`}>
+                    ML Cognitive Theme Evaluator
+                  </h4>
+                  <p className="text-[9px] text-stone-500 font-mono">NEURAL THEMATIC FEEDBACK LOOP</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className={isLight ? 'text-stone-600' : 'text-stone-400'}>Contrast Stability Index:</span>
+                  <span className={`font-bold ${themeAnalysis.score >= 90 ? 'text-emerald-500' : 'text-amber-500 animate-pulse'}`}>
+                    {themeAnalysis.score}% {themeAnalysis.score >= 90 ? 'STABLE' : 'DEVIATION ALERT'}
+                  </span>
+                </div>
+
+                {/* Animated scoring bar */}
+                <div className="h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-1000 ${
+                      themeAnalysis.score >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]'
+                    }`} 
+                    style={{ width: `${themeAnalysis.score}%` }} 
+                  />
+                </div>
+
+                <div className={`text-[10px] leading-relaxed p-2.5 rounded-lg font-mono ${
+                  isLight ? 'bg-[#f4f2f0] text-stone-700 border border-stone-200' : 'bg-[#0f1124] text-cyan-300/90 border border-cyan-500/10'
+                }`}>
+                  <span className="text-stone-500 font-bold uppercase text-[8px] block mb-0.5">Engine Diagnosis:</span>
+                  {themeAnalysis.description}
+                </div>
+
+                {themeAnalysis.score < 90 && onChangeTheme && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (soundEnabled) playCyberChirp('success');
+                      onChangeTheme({ mode: theme.mode, palette: themeAnalysis.recommendation as any });
+                    }}
+                    className={`w-full py-2 px-3 rounded-lg font-mono text-[10px] font-bold uppercase transition-all duration-300 border shadow-md hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isLight 
+                        ? 'bg-stone-900 text-white border-stone-800 hover:bg-stone-800' 
+                        : 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-stone-950 border-cyan-400 font-bold hover:brightness-110 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                    }`}
+                  >
+                    <Sparkles className="h-3 w-3 animate-pulse" />
+                    Auto-Tune Theme: [{themeAnalysis.recommendation.toUpperCase()}]
+                  </button>
+                )}
+                {themeAnalysis.score >= 90 && (
+                  <div className={`flex items-center justify-center gap-1.5 p-2 rounded-lg text-[9px] font-mono leading-none ${
+                    isLight ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-emerald-500/5 text-emerald-400 border border-emerald-500/10'
+                  }`}>
+                    <CheckCircle className="h-3 w-3" />
+                    COGNITIVE ALIGNMENT RATING PERFECT
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* RIGHT SIDE: LOSS CURVE CHART, CAPABILITIES & REAL-TIME TERMINAL */}
@@ -1454,7 +1531,8 @@ export default function AIInsights({
                       {/* Area geometry */}
                       <path
                         d={`M 10,75 L ${mlDetails.losses.map((val, idx) => {
-                          const x = idx * (230 / (mlDetails.losses.length - 1)) + 10;
+                          const lengthDenom = mlDetails.losses.length > 1 ? mlDetails.losses.length - 1 : 1;
+                          const x = idx * (230 / lengthDenom) + 10;
                           const y = Math.max(10, 75 - (val * 65));
                           return `${x},${y}`;
                         }).join(' ')} L 240,75 Z`}
@@ -1469,7 +1547,8 @@ export default function AIInsights({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={mlDetails.losses.map((val, idx) => {
-                          const x = idx * (230 / (mlDetails.losses.length - 1)) + 10;
+                          const lengthDenom = mlDetails.losses.length > 1 ? mlDetails.losses.length - 1 : 1;
+                          const x = idx * (230 / lengthDenom) + 10;
                           const y = Math.max(10, 75 - (val * 65));
                           return `${x},${y}`;
                         }).join(' ')}
@@ -1477,9 +1556,13 @@ export default function AIInsights({
 
                       {/* Interactive dot on final loss value */}
                       {(() => {
+                        if (!mlDetails.losses || mlDetails.losses.length === 0) return null;
                         const finalIdx = mlDetails.losses.length - 1;
-                        const fx = finalIdx * (230 / finalIdx) + 10;
+                        if (mlDetails.losses[finalIdx] === undefined || isNaN(mlDetails.losses[finalIdx])) return null;
+                        const fxDenom = finalIdx > 0 ? finalIdx : 1;
+                        const fx = finalIdx * (230 / fxDenom) + 10;
                         const fy = Math.max(10, 75 - (mlDetails.losses[finalIdx] * 65));
+                        if (isNaN(fx) || isNaN(fy)) return null;
                         return (
                           <circle cx={fx} cy={fy} r="3.5" fill={neuralColors.hex} stroke="white" strokeWidth="1" className="animate-pulse" />
                         );

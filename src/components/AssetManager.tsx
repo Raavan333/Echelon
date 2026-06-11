@@ -21,7 +21,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { EchelonTheme, Asset, AssetType, FundTransfer } from '../types';
-import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
+import { getColorTokens, renderPremiumProgressBar, isThemeLight } from '../utils/theme';
 
 export function getIndianStockTaxDetails(asset: Asset, currentDateStr: string = '2026-06-05', usdRate: number = 83.5, currencySymbol: string = '₹') {
   if (asset.type !== AssetType.STOCK && asset.type !== AssetType.EQUITY) return null;
@@ -174,7 +174,7 @@ export default function AssetManager({
   const [shifterSuccess, setShifterSuccess] = useState<string>('');
 
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
 
   const handleExecuteShifter = (e: React.FormEvent) => {
     e.preventDefault();

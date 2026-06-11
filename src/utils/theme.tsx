@@ -6,6 +6,30 @@
 import React from 'react';
 import { EchelonTheme } from '../types';
 
+export function isThemeLight(theme: EchelonTheme): boolean {
+  const lightPalettes = [
+    'skyblue-peacock',
+    'hotpink-marble',
+    'skyblue',
+    'pure-light',
+    'sand-drift',
+    'lavender-blush',
+    'mint-fresh'
+  ];
+  const darkPalettes = [
+    'stealth-gold',
+    'black-steel',
+    'royal-emerald',
+    'rose-amethyst',
+    'platinum-silver',
+    'slate-amber',
+    'elegant-dark'
+  ];
+  if (theme.palette && lightPalettes.includes(theme.palette)) return true;
+  if (theme.palette && darkPalettes.includes(theme.palette)) return false;
+  return theme.mode !== 'dark'; // fallback
+}
+
 export interface ColorTokens {
   bg: string;
   card: string;
@@ -337,18 +361,18 @@ export function getColorTokens(theme: EchelonTheme, customAccentColor?: string):
 
     case 'elegant-dark':
       tokens = {
-        bg: 'bg-[#020206]',
-        card: 'bg-[#080811]/95 border border-cyan-500/25 shadow-[0_0_20px_rgba(6,182,212,0.15)] backdrop-blur-md',
-        cardHover: 'hover:border-pink-500/40 hover:bg-[#0c0d1e]/95 hover:shadow-[0_0_25px_rgba(236,72,153,0.2)]',
-        textPrimary: 'text-[#00f3ff] drop-shadow-[0_0_2px_rgba(0,243,255,0.3)] font-mono',
-        textSecondary: 'text-stone-400 font-mono text-[11px]',
-        accent: 'bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-stone-950 font-bold tracking-wider uppercase shadow-[0_0_15px_rgba(0,243,255,0.4)]',
-        accentHover: 'hover:opacity-90 hover:scale-105 transition-allDuration-300',
+        bg: 'bg-[#0B0E14]',
+        card: 'bg-[#141923] border border-white/5 shadow-md rounded-2xl relative overflow-hidden',
+        cardHover: 'hover:border-cyan-500/30 hover:bg-[#1a212e]/90 hover:shadow-lg transition-all duration-300',
+        textPrimary: 'text-stone-100 font-sans',
+        textSecondary: 'text-stone-400 font-sans text-[11.5px]',
+        accent: 'bg-gradient-to-r from-cyan-400 to-amber-500 text-stone-950 font-bold tracking-wider uppercase',
+        accentHover: 'hover:opacity-90',
         accentText: 'text-[#00f3ff] font-mono font-bold',
-        border: 'border-cyan-500/20',
-        borderAccent: 'border-fuchsia-500/40',
-        buttonBg: 'bg-[#0c0f1d] border border-cyan-500/20 hover:border-pink-500/50 text-cyan-400 hover:text-[#00f3ff] hover:bg-[#11172a] transition-all',
-        glow: 'shadow-[0_0_20px_rgba(6,182,212,0.2)]',
+        border: 'border-white/5',
+        borderAccent: 'border-cyan-500/20',
+        buttonBg: 'bg-[#1e2535] border border-white/5 hover:border-cyan-500/30 text-cyan-400 hover:text-[#00f3ff] hover:bg-[#252f44] transition-all',
+        glow: 'shadow-[0_0_15px_rgba(6,182,212,0.1)]',
         badgeBg: 'bg-cyan-500/10 text-[#00f3ff] border border-cyan-500/30 font-mono text-[10px]',
         badgeText: 'text-[#00f3ff]'
       };
@@ -410,7 +434,7 @@ export function renderPremiumProgressBar(
 
   if (style === 'ultra-thin') {
     return (
-      <div className="w-full h-0.5 rounded-full bg-stone-200/5 dark:bg-stone-850 overflow-hidden">
+      <div className="w-full h-0.5 rounded-full bg-stone-300/70 dark:bg-stone-800 overflow-hidden">
         <div 
           className={`h-full transition-all duration-500 ${!bgStyle ? colorClass : ''}`} 
           style={{ width: widthVal, ...bgStyle }} 
@@ -421,7 +445,7 @@ export function renderPremiumProgressBar(
   
   if (style === 'neon-glow') {
     return (
-      <div className="w-full h-1 rounded-full bg-stone-500/10 dark:bg-stone-900 overflow-visible relative">
+      <div className="w-full h-1 rounded-full bg-stone-300/80 dark:bg-stone-900 overflow-visible relative">
         <div 
           className={`h-full rounded-full transition-all duration-500 ${!bgStyle ? colorClass : ''}`} 
           style={{ 
@@ -435,7 +459,7 @@ export function renderPremiumProgressBar(
   }
   
   return (
-    <div className="w-full h-2 rounded-md bg-stone-900/60 border border-stone-800/40 p-0.5 overflow-hidden flex items-center justify-start">
+    <div className="w-full h-2 rounded-md bg-stone-200 dark:bg-stone-900/60 border border-stone-300 dark:border-stone-800/40 p-0.5 overflow-hidden flex items-center justify-start">
       <div 
         className={`h-full rounded-sm transition-all duration-500 ${!bgStyle ? colorClass : ''}`} 
         style={{ width: widthVal, ...bgStyle }} 

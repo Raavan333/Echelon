@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, ArrowUpRight, ShieldAlert, Sparkles, CheckSquare, Layers, Download, CheckCircle, FileSpreadsheet, FileText, Landmark, RefreshCw, Edit3, X } from 'lucide-react';
 import { EchelonTheme, Budget, Expense, BudgetPeriod, BudgetCategoryLimit, Asset, CreditCard } from '../types';
-import { getColorTokens, renderPremiumProgressBar } from '../utils/theme';
+import { getColorTokens, renderPremiumProgressBar, isThemeLight } from '../utils/theme';
 import { generateCSVData, generateHTMLReport, downloadBlob } from '../utils/export';
 
 interface BudgetManagerProps {
@@ -127,7 +127,7 @@ export default function BudgetManager({
   const [editExpenseNotes, setEditExpenseNotes] = useState<string>('');
 
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
 
   // Spend totals calculations
   const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -286,7 +286,7 @@ export default function BudgetManager({
             <form onSubmit={handleSaveBudget} className="space-y-3.5">
               <div>
                 <label className="text-[10px] uppercase font-bold text-stone-400 font-mono block mb-1">Calculated Limit Ceiling ({currencySymbol})</label>
-                <div className="w-full px-3 py-2 bg-stone-950 border border-stone-850 rounded-xl text-xs font-mono font-bold text-amber-500 flex items-center justify-between">
+                <div className={`w-full px-3 py-2 border rounded-xl text-xs font-mono font-bold text-amber-500 flex items-center justify-between ${isLight ? 'bg-stone-50 border-stone-250' : 'bg-stone-950 border-stone-850'}`}>
                   <span>{currencySymbol}{computedBudgetAmount.toLocaleString('en-IN')}</span>
                   <span className="text-[9px] uppercase tracking-wider bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded font-black border border-amber-500/20">Auto-Compiled</span>
                 </div>
@@ -302,7 +302,7 @@ export default function BudgetManager({
                     id="budget-period-select"
                     value={period}
                     onChange={(e) => setPeriod(e.target.value as BudgetPeriod)}
-                    className="w-full px-2 py-1.5 bg-stone-950 font-semibold border border-stone-800 rounded-xl text-xs text-stone-200"
+                    className={`w-full px-2 py-1.5 font-semibold border rounded-xl text-xs ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-950 border-stone-800 text-stone-200'}`}
                   >
                     <option value={BudgetPeriod.WEEKLY}>Weekly</option>
                     <option value={BudgetPeriod.MONTHLY}>Monthly</option>
@@ -318,7 +318,7 @@ export default function BudgetManager({
                     max="100"
                     value={alertPercent}
                     onChange={(e) => setAlertPercent(e.target.value)}
-                    className={`w-full px-2 py-1.5 bg-stone-900 border ${tokens.border} rounded-xl text-xs text-stone-200`}
+                    className={`w-full px-2 py-1.5 border rounded-xl text-xs ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-none text-stone-200`}`}
                   />
                 </div>
               </div>
@@ -388,7 +388,11 @@ export default function BudgetManager({
                   <button
                     type="button"
                     onClick={() => setIsManagingCategories(!isManagingCategories)}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-zinc-90 w bg-stone-500/10 border border-stone-800 hover:border-amber-500/30 text-stone-400 hover:text-amber-500 rounded-lg text-[10px] font-mono font-bold transition-all shrink-0 select-none"
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all shrink-0 select-none ${
+                      isLight 
+                        ? 'bg-stone-100 text-stone-700 border border-stone-300 hover:border-amber-500 hover:bg-amber-500/10 hover:text-amber-600'
+                        : 'bg-stone-500/10 text-stone-400 border border-stone-800 hover:border-amber-500/30 hover:text-amber-500'
+                    }`}
                   >
                     {isManagingCategories ? (
                       <>
@@ -405,8 +409,12 @@ export default function BudgetManager({
                 </div>
 
                 {isManagingCategories ? (
-                  <div className="space-y-3 p-3 rounded-2xl bg-stone-500/5 border border-stone-850/50 animate-fade-in text-xs">
-                    <span className="text-[10px] font-bold text-stone-400 font-mono block mb-1">Interactive Category Manager</span>
+                  <div className={`space-y-3 p-3 rounded-2xl border animate-fade-in text-xs ${
+                    isLight 
+                      ? 'bg-stone-100/50 border-stone-300 text-stone-800' 
+                      : 'bg-stone-500/5 border-stone-850/50 text-stone-300'
+                  }`}>
+                    <span className={`text-[10px] font-bold font-mono block mb-1 ${isLight ? 'text-stone-650' : 'text-stone-400'}`}>Interactive Category Manager</span>
                     
                     <div className="space-y-2 max-h-56 overflow-y-auto">
                       {activeCategories.map((c, index) => {
@@ -427,7 +435,7 @@ export default function BudgetManager({
                                     type="number"
                                     value={editingCatLimit}
                                     onChange={(e) => setEditingCatLimit(e.target.value)}
-                                    className="w-20 px-2 py-1 bg-stone-900 border border-stone-800 rounded text-xs text-white outline-none font-mono"
+                                    className={`w-20 px-2 py-1 border rounded text-xs outline-none font-mono ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                                     placeholder="Limit"
                                   />
                                 </div>
@@ -450,7 +458,7 @@ export default function BudgetManager({
                               </div>
                             ) : (
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-stone-300">
+                                <span className={`font-semibold ${isLight ? 'text-stone-850' : 'text-stone-300'}`}>
                                   {c.category} <span className="text-[10px] font-mono text-stone-500 ml-1">({currencySymbol}{c.limit.toLocaleString('en-IN')})</span>
                                 </span>
                                 <div className="flex items-center gap-1.5">
@@ -483,7 +491,7 @@ export default function BudgetManager({
 
                     {/* Quick Add Form */}
                     <form onSubmit={handleAddNewCategory} className="border-t border-stone-800/40 pt-2.5 space-y-1.5">
-                      <span className="text-[10px] text-stone-400 font-bold font-mono block">Create Custom Category</span>
+                      <span className={`text-[10px] ${isLight ? 'text-stone-700' : 'text-stone-400'} font-bold font-mono block`}>Create Custom Category</span>
                       <div className="flex gap-1.5">
                         <input
                           type="text"
@@ -491,7 +499,7 @@ export default function BudgetManager({
                           value={newCatName}
                           onChange={(e) => setNewCatName(e.target.value)}
                           placeholder="e.g. Entertainment"
-                          className="flex-1 min-w-0 px-2 py-1 bg-stone-900 border border-stone-800 rounded text-xs text-white outline-none"
+                          className={`flex-1 min-w-0 px-2 py-1 border rounded text-xs outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                         />
                         <input
                           type="number"
@@ -499,7 +507,7 @@ export default function BudgetManager({
                           value={newCatLimit}
                           onChange={(e) => setNewCatLimit(e.target.value)}
                           placeholder="Limit"
-                          className="w-16 px-2 py-1 bg-stone-900 border border-stone-800 rounded text-xs text-white outline-none font-mono"
+                          className={`w-16 px-2 py-1 border rounded text-xs outline-none font-mono ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                         />
                         <button
                           type="submit"
@@ -518,8 +526,8 @@ export default function BudgetManager({
                     return (
                       <div key={c.category} className="space-y-1">
                         <div className="flex items-baseline justify-between text-[11px]">
-                          <span className="font-semibold text-stone-200">{c.category}</span>
-                          <span className={`font-mono font-bold ${catOver ? 'text-red-500 font-extrabold' : 'text-stone-400'}`}>
+                          <span className={`font-semibold ${isLight ? 'text-stone-850' : 'text-stone-200'}`}>{c.category}</span>
+                          <span className={`font-mono font-bold ${catOver ? 'text-red-500 font-extrabold' : isLight ? 'text-stone-600' : 'text-stone-400'}`}>
                             {currencySymbol}{catSpend.toLocaleString('en-IN')} / {currencySymbol}{c.limit.toLocaleString('en-IN')}
                           </span>
                         </div>
@@ -545,7 +553,11 @@ export default function BudgetManager({
             type="button"
             id="configure-budget-btn"
             onClick={() => setIsEditingBudget(true)}
-            className="mt-6 w-full py-2 bg-stone-100/5 hover:bg-stone-100/10 border border-stone-700/50 rounded-xl text-stone-200 text-xs font-semibold font-mono transition-all"
+            className={`mt-6 w-full py-2 rounded-xl text-xs font-semibold font-mono transition-all justify-center ${
+              isLight 
+                ? 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 shadow-xs'
+                : 'bg-stone-100/5 hover:bg-stone-100/10 text-stone-200 border-stone-700/50'
+            }`}
           >
             Adjust Budget Rules
           </button>
@@ -564,7 +576,11 @@ export default function BudgetManager({
               type="button"
               id="toggle-add-expense-btn"
               onClick={() => setShowAddExpense(!showAddExpense)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-stone-200 border border-stone-700 rounded-xl text-xs font-semibold hover:bg-zinc-750"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold hover:opacity-90 transition-all ${
+                isLight 
+                  ? 'bg-stone-100 text-stone-800 border border-stone-300' 
+                  : 'bg-zinc-800 text-stone-200 border border-stone-750 hover:bg-zinc-750'
+              }`}
             >
               <Plus className="h-4 w-4" />
               <span>Log Outflow</span>
@@ -573,14 +589,14 @@ export default function BudgetManager({
 
           {/* SPEND OUTFLOW CAPTURE FORM */}
           {showAddExpense && (
-            <form onSubmit={handleAddSpend} className="mb-4 p-4 rounded-2xl border border-dashed border-stone-800 bg-stone-500/5 grid grid-cols-1 sm:grid-cols-2 gap-3.5 animate-fade-in">
+            <form onSubmit={handleAddSpend} className={`mb-4 p-4 rounded-2xl border border-dashed grid grid-cols-1 sm:grid-cols-2 gap-3.5 animate-fade-in ${isLight ? 'border-stone-300 bg-stone-50' : 'border-stone-800 bg-stone-500/5'}`}>
               <div>
                 <label htmlFor="expense-category-select" className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-1">Group classification</label>
                 <select
                   id="expense-category-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:border-amber-500/40 focus:outline-none"
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:border-amber-500/40 focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-950 border-stone-800 text-stone-200'}`}
                 >
                   {activeCategories.map((catObj) => (
                     <option key={catObj.category} value={catObj.category}>
@@ -641,7 +657,7 @@ export default function BudgetManager({
                   required
                   value={sourceId}
                   onChange={(e) => setSourceId(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:border-amber-500/40 focus:outline-none font-semibold"
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:border-amber-500/40 focus:outline-none font-semibold ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-950 border-stone-880 text-stone-200'}`}
                 >
                   <option value="" disabled>-- Select Anchor --</option>
                   {sourceType === 'bank_balance' ? (
@@ -675,7 +691,7 @@ export default function BudgetManager({
                   placeholder={`${currencySymbol} Amount`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 bg-stone-900 border ${tokens.border} rounded-xl text-xs focus:outline-none`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
                 />
               </div>
 
@@ -687,7 +703,7 @@ export default function BudgetManager({
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 bg-stone-900 border ${tokens.border} rounded-xl text-xs focus:outline-none`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
                 />
               </div>
 
@@ -699,7 +715,7 @@ export default function BudgetManager({
                   placeholder="e.g. Weekly organic farm veggies"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 bg-stone-900 border ${tokens.border} rounded-xl text-xs focus:outline-none`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
                 />
               </div>
 
@@ -735,14 +751,14 @@ export default function BudgetManager({
                   const isEditing = editingExpenseId === e.id;
                   if (isEditing) {
                     return (
-                      <div key={e.id} className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-2.5 animate-fade-in text-xs">
+                      <div key={e.id} className={`p-3 rounded-xl border border-amber-500/30 space-y-2.5 animate-fade-in text-xs ${isLight ? 'bg-stone-50 text-stone-900 shadow-sm' : 'bg-zinc-950 text-stone-200'}`}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="text-[9px] uppercase font-bold text-stone-500 font-mono block mb-0.5">Classification</label>
                             <select
                               value={editExpenseCat}
                               onChange={(val) => setEditExpenseCat(val.target.value)}
-                              className="w-full px-2 py-1 bg-stone-904 bg-stone-900 border border-stone-800 rounded-lg text-xs text-stone-200 focus:outline-none"
+                              className={`w-full px-2 py-1 border rounded-lg text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-stone-200'}`}
                             >
                               {activeCategories.map((catObj) => (
                                 <option key={catObj.category} value={catObj.category}>{catObj.category}</option>
@@ -755,7 +771,7 @@ export default function BudgetManager({
                               type="number"
                               value={editExpenseAmt}
                               onChange={(val) => setEditExpenseAmt(val.target.value)}
-                              className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none font-mono"
+                              className={`w-full px-2 py-1 border rounded-lg text-xs outline-none font-mono ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                             />
                           </div>
                           <div>
@@ -764,7 +780,7 @@ export default function BudgetManager({
                               type="date"
                               value={editExpenseDate}
                               onChange={(val) => setEditExpenseDate(val.target.value)}
-                              className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none"
+                              className={`w-full px-2 py-1 border rounded-lg text-xs outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                             />
                           </div>
                           <div>
@@ -773,7 +789,7 @@ export default function BudgetManager({
                               type="text"
                               value={editExpenseNotes}
                               onChange={(val) => setEditExpenseNotes(val.target.value)}
-                              className="w-full px-2 py-1 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white outline-none"
+                              className={`w-full px-2 py-1 border rounded-lg text-xs outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : 'bg-stone-900 border-stone-800 text-white'}`}
                             />
                           </div>
                         </div>
@@ -839,12 +855,12 @@ export default function BudgetManager({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                <span className="text-xs font-bold font-mono text-stone-300 uppercase">Secure Vault Close-off</span>
+                <span className={`text-xs font-bold font-mono uppercase ${isLight ? 'text-stone-850' : 'text-stone-300'}`}>Secure Vault Close-off</span>
               </div>
-              <span className="text-[10px] font-mono text-stone-500">End-Term Reset</span>
+              <span className="text-[10px] font-mono text-stone-500 font-bold">End-Term Reset</span>
             </div>
 
-            <p className="text-[11px] text-stone-400 mb-4 leading-normal">
+            <p className={`text-[11px] mb-4 leading-normal ${isLight ? 'text-stone-750' : 'text-stone-400'}`}>
               Finalize this month's ledger, generate encrypted Excel (.CSV) and PDF files directly to your device local downloads storage space, then reset active spending tags automatically.
             </p>
 
@@ -884,7 +900,7 @@ export default function BudgetManager({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <span className="text-xs uppercase font-bold tracking-widest text-amber-500 font-mono block mb-1">Treasury Ledger Analytics</span>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-stone-850' : 'text-white'}`}>
               📊 Historical Saving vs Spending Ratios
             </h3>
             <p className="text-xs text-stone-500 mt-1 leading-normal">
@@ -892,12 +908,16 @@ export default function BudgetManager({
             </p>
           </div>
 
-          <div className="flex bg-[#141517] p-1 rounded-xl border border-stone-850 self-start">
+          <div className={`flex p-1 rounded-xl border self-start ${isLight ? 'bg-stone-200/80 border-stone-300' : 'bg-[#141517] border-stone-850'}`}>
             <button
               type="button"
               onClick={() => setSelectedChartTab('monthly')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
-                selectedChartTab === 'monthly' ? 'text-stone-950 bg-amber-500 font-black' : 'text-stone-400 hover:text-stone-200'
+                selectedChartTab === 'monthly' 
+                  ? 'text-stone-950 bg-amber-500 font-extrabold shadow-xs' 
+                  : isLight 
+                    ? 'text-stone-600 hover:text-stone-900 hover:bg-stone-100' 
+                    : 'text-stone-400 hover:text-stone-200'
               }`}
             >
               3-Month Trend
@@ -906,7 +926,11 @@ export default function BudgetManager({
               type="button"
               onClick={() => setSelectedChartTab('quarterly')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
-                selectedChartTab === 'quarterly' ? 'text-stone-950 bg-amber-500 font-black' : 'text-stone-400 hover:text-stone-200'
+                selectedChartTab === 'quarterly' 
+                  ? 'text-stone-950 bg-amber-500 font-extrabold shadow-xs' 
+                  : isLight 
+                    ? 'text-stone-600 hover:text-stone-900 hover:bg-stone-100' 
+                    : 'text-stone-400 hover:text-stone-200'
               }`}
             >
               4-Quarter Comparison
@@ -915,7 +939,7 @@ export default function BudgetManager({
         </div>
 
         {/* Visual Columns Chart */}
-        <div className="p-4 rounded-2xl bg-stone-950/40 border border-stone-850/50 space-y-5">
+        <div className={`p-4 rounded-2xl border space-y-5 ${isLight ? 'bg-stone-150/40 border-stone-250' : 'bg-stone-950/40 border-stone-850/50'}`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             {(() => {
               const curDate = new Date();
@@ -999,13 +1023,13 @@ export default function BudgetManager({
 
                   {/* Sleek single stacked progress vector */}
                   <div className="space-y-2.5">
-                    <div className="w-full bg-[#111116] h-2.5 rounded-full overflow-hidden flex border border-stone-850">
+                    <div className={`w-full h-2.5 rounded-full overflow-hidden flex border ${isLight ? 'bg-stone-250 border-stone-300' : 'bg-[#111116] border-stone-850'}`}>
                       <div
-                        className="bg-red-500 h-full transition-all duration-500"
+                        className="bg-red-600 h-full transition-all duration-500"
                         style={{ width: `${spendPct}%` }}
                       />
                       <div
-                        className="bg-emerald-500 h-full transition-all duration-500"
+                        className="bg-emerald-600 h-full transition-all duration-500"
                         style={{ width: `${savePct}%` }}
                       />
                     </div>
@@ -1014,14 +1038,14 @@ export default function BudgetManager({
                     <div className="grid grid-cols-2 gap-3.5 pt-1">
                       <div className="text-[10px] font-mono flex flex-col">
                         <span className="text-stone-500 uppercase tracking-widest text-[8px] font-bold">Allocated Expenditures</span>
-                        <span className="text-stone-200 font-bold mt-0.5">
+                        <span className={`font-bold mt-0.5 ${isLight ? 'text-stone-850' : 'text-stone-200'}`}>
                           {currencySymbol}{point.spend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                           <span className="text-stone-500 font-normal ml-1">({spendPct.toFixed(0)}%)</span>
                         </span>
                       </div>
                       <div className="text-[10px] font-mono flex flex-col">
                         <span className="text-stone-500 uppercase tracking-widest text-[8px] font-bold">Unspent Reserves Retained</span>
-                        <span className="text-emerald-400 font-bold mt-0.5">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                           {currencySymbol}{point.save.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                           <span className="text-stone-500 font-normal ml-1">({savePct.toFixed(0)}%)</span>
                         </span>
@@ -1038,7 +1062,7 @@ export default function BudgetManager({
             <span className="text-base select-none">💡</span>
             <div className="space-y-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-amber-500 block">Sovereign Compliance Verdict</span>
-              <p className="text-[11px] text-stone-300 leading-normal">
+              <p className={`text-[11px] leading-normal ${isLight ? 'text-stone-750' : 'text-stone-300'}`}>
                 {selectedChartTab === 'monthly' 
                   ? "Comparing your active monthly expense flow against historical trends indicates a stable compounding trajectory. Accumulating surplus of over 30% acts as a formidable capital shield."
                   : "Quarterly reviews verify consistent long-term velocity. Continuing to prioritize high-compounding debt paydowns while maintaining a low spending quotient secures exponential net worth milestones."

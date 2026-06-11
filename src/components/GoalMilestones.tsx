@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Calendar, Award, Compass, Timer, AlertTriangle, ShieldCheck, Edit3, X, CheckSquare } from 'lucide-react';
 import { EchelonTheme, FinancialGoal, Asset } from '../types';
-import { getColorTokens } from '../utils/theme';
+import { getColorTokens, isThemeLight } from '../utils/theme';
 import { estimateTimeToGoal } from '../utils/math';
 
 interface GoalMilestonesProps {
@@ -72,7 +72,7 @@ export default function GoalMilestones({
   };
 
   const tokens = getColorTokens(theme);
-  const isLight = theme.mode === 'light';
+  const isLight = isThemeLight(theme);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
