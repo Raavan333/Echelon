@@ -283,13 +283,8 @@ export default function HoldingSummary({
   const totalYieldAmount = onlyAssetsYieldAmount + lentLoansYieldAmount;
   const netYieldAmount = totalYieldAmount - totalBorrowedInterestCosts;
 
-  // Use the larger of investment base or borrowed liabilities to scale the blended rate correctly when loaded with debt
-  const totalAssetsValConverted = totalAssetsVal;
-  const totalInvestmentBase = totalAssetsValConverted + totalLentVal;
-  const totalActiveCapitalDenominator = Math.max(totalInvestmentBase, totalBorrowedVal);
-  const blendedAPY = totalActiveCapitalDenominator > 0 
-    ? (netYieldAmount / totalActiveCapitalDenominator) * 100 
-    : 0;
+  // Use exact wealth-rates compounding calculation on present capital (assets vs loans growth differentials)
+  const blendedAPY = rates.earningsRatePercentOfYear;
 
   // Monthly growth percentage reflects the compounding APY divided by 12, perfectly aligned with net compound velocity
   const monthlyGrowthPct = blendedAPY / 12;
@@ -470,6 +465,15 @@ export default function HoldingSummary({
       setDashboardSmsAlert(null);
     }
   };
+
+  // 4. Real-time predictive spending projection variables
+  const currentMonthSpendsVal = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const monthlyBudgetCapVal = budgetAmount || 15000;
+  const predictedMonthlySpendsVal = monthlyBudgetCapVal + currentMonthSpendsVal;
+  const predictedYearlySpendsVal = predictedMonthlySpendsVal * 12;
+  const spendBurnRatePercent = totalPortfolioValue > 0 
+    ? (predictedYearlySpendsVal / totalPortfolioValue) * 100 
+    : 0;
 
   return (
     <div id="holding-summary-dashboard" className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
@@ -784,6 +788,54 @@ export default function HoldingSummary({
               );
             })}
           </div>
+
+          {/* Predictive Spending Card Block */}
+          <div className={`mt-6 p-4 rounded-2xl border ${isLight ? 'bg-rose-50/40 border-rose-150/40' : 'bg-pink-950/10 border-pink-500/10'} space-y-3 relative overflow-hidden text-left`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Flame className="h-4.5 w-4.5 text-pink-500 animate-pulse" />
+                <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-rose-850' : 'text-white'}`}>🔮 COGNITIVE SPEND PREDICTOR</span>
+              </div>
+              <span className={`text-[9.5px] font-mono px-2 py-0.5 rounded-md border ${isLight ? 'bg-rose-100/50 text-rose-700 border-rose-250/50' : 'bg-pink-500/10 text-pink-400 border-pink-500/25'}`}>
+                BURN RATE: {spendBurnRatePercent.toFixed(1)}%/yr
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 font-mono">
+              <div className={`p-2 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-150' : 'bg-black/40 border-stone-900'}`}>
+                <span className="text-[7.5px] uppercase tracking-widest text-stone-500 block">Current Spends</span>
+                <span className={`text-xs font-black ${isLight ? 'text-stone-900 font-extrabold' : 'text-white'} block mt-0.5`}>
+                  {currencySymbol}{currentMonthSpendsVal.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[7.5px] text-stone-400">logged this month</span>
+              </div>
+
+              <div className={`p-2 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-150' : 'bg-black/40 border-stone-900'}`}>
+                <span className="text-[7.5px] uppercase tracking-widest text-stone-500 block">Predicted Spends</span>
+                <span className={`text-xs font-black ${isLight ? 'text-stone-900 font-extrabold' : 'text-white'} block mt-0.5`}>
+                  {currencySymbol}{predictedMonthlySpendsVal.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[7.5px] text-stone-400">by end of month</span>
+              </div>
+            </div>
+
+            {/* Annual projection row */}
+            <div className={`p-2 rounded-xl border flex items-center justify-between ${isLight ? 'bg-rose-50/70 border-rose-150' : 'bg-stone-950/60 border-pink-500/10'}`}>
+              <div>
+                <span className="text-[8px] uppercase tracking-wider text-stone-500 block font-bold">PREDICTED YEARLY DRAIN</span>
+                <p className="text-[7.5px] leading-tight text-stone-400 mt-0.5">Linear projection of current month rate</p>
+              </div>
+              <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-rose-700' : 'text-pink-400'}`}>
+                {currencySymbol}{predictedYearlySpendsVal.toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {/* Explainer note defending correct math */}
+            <p className="text-[8px] leading-relaxed text-stone-500 font-sans italic">
+              ℹ️ <span className="font-bold">ARCHITECTURAL TRUTH:</span> This project excludes future unearned salary projections. Because salary for the rest of year does not exist yet today, blending it into portfolio interest return rates creates mathematical illusion. This board separates asset compound rate ({blendedAPY.toFixed(2)}%) from spending-drain velocities.
+            </p>
+          </div>
+
         </div>
       </div>
 

@@ -418,10 +418,23 @@ export default function App() {
     } catch (_) {}
   };
 
-  const handleUpdateSmsPermission = (state: 'denied' | 'prompt' | 'granted') => {
+  const handleUpdateSmsPermission = async (state: 'denied' | 'prompt' | 'granted') => {
     setSmsPermissionState(state);
     try {
       localStorage.setItem('echelon_sms_telemetry', state);
+      if (state === 'granted') {
+        const { Capacitor, registerPlugin } = await import('@capacitor/core');
+        if (Capacitor.isNativePlatform()) {
+          const SmsReceiver = registerPlugin<any>('SmsReceiver');
+          if (SmsReceiver) {
+            const req = await SmsReceiver.requestSmsPermission();
+            if (req && req.state) {
+              setSmsPermissionState(req.state);
+              localStorage.setItem('echelon_sms_telemetry', req.state);
+            }
+          }
+        }
+      }
     } catch (_) {}
   };
   const [modalCatName, setModalCatName] = useState<string>('');
@@ -614,6 +627,112 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isLocked, vaultData?.securityTimeoutMinutes]);
+
+  // Automated background Echelon server and device SMS sync hook
+  useEffect(() => {
+    if (isLocked || !vaultData) return;
+
+    const performSmsLedgerSync = async () => {
+      try {
+        let localSmsList: any[] = [];
+        
+        // 1. If running as a native app, grab device-level banking alerts
+        try {
+          const core = await import('@capacitor/core');
+          if (core?.Capacitor?.isNativePlatform()) {
+            const SmsReceiver = core.registerPlugin<any>('SmsReceiver');
+            if (SmsReceiver) {
+              const status = await SmsReceiver.getSmsPermissionState();
+              if (status?.state === 'granted') {
+                const result = await SmsReceiver.readSmsInbox();
+                if (result && result.messages) {
+                  localSmsList = result.messages.map((m: any) => ({
+                    id: m.id,
+                    rawText: m.body,
+                    timestamp: new Date(Number(m.date)).toISOString(),
+                    address: m.address
+                  }));
+                  
+                  // Instantly sync the local native SMS batch to our backend SQL / persistent server store
+                  await fetch('/api/sms/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: localSmsList })
+                  });
+                }
+              }
+            }
+          }
+        } catch (nativeErr) {
+          console.warn("Capacitor Native SMS fetch bypassed:", nativeErr);
+        }
+
+        // 2. Fetch the updated queue from the Echelon server SMS repository
+        const response = await fetch('/api/sms/sync');
+        if (response.ok) {
+          const resJson = await response.json();
+          const serverMessages: any[] = resJson.messages || [];
+
+          // Collate unique logs
+          const combined: any[] = [...localSmsList];
+          serverMessages.forEach(sm => {
+            if (!combined.some(c => c.id === sm.id)) {
+              combined.push(sm);
+            }
+          });
+
+          // Filter out elements that are already verified and entered in the current vault expenses
+          const historicalExpenses = vaultData.expenses || [];
+          
+          const unprocessed = combined.filter((msg: any) => {
+            // Check if this exact text/id was already processed
+            const bodyLower = msg.rawText.toLowerCase();
+            const amtMatch = msg.rawText.match(/(?:rs\.?|inr|₹|inr\.)\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.]\d+)?)\s*(?:inr|rupees|rs|spent|debited)/i);
+            let checkAmt = 0;
+            if (amtMatch) {
+              const grp = amtMatch[1] || amtMatch[2];
+              if (grp) checkAmt = parseFloat(grp.replace(/,/g, ''));
+            }
+
+            const isAlreadyLogged = historicalExpenses.some((e: any) => {
+              const matchesAmt = Math.abs(e.amount - checkAmt) < 0.1;
+              const hasTag = e.notes && e.notes.toLowerCase().includes('sms verified');
+              return matchesAmt && hasTag;
+            });
+
+            return !isAlreadyLogged;
+          });
+
+          if (unprocessed.length > 0) {
+            const mappedQueue = unprocessed.map((m: any) => {
+              const staticPred = getSmartPredictiveSmsDetails(m.rawText);
+              return {
+                id: m.id,
+                rawText: m.rawText,
+                parsedAmt: staticPred.parsedAmt,
+                parsedAssetId: staticPred.parsedAssetId,
+                parsedAssetName: staticPred.parsedAssetName,
+                parsedCategory: staticPred.parsedCategory,
+                timestamp: m.timestamp || new Date().toISOString(),
+                merchant: staticPred.merchant,
+                hasBeenPredicted: false,
+                isLoadingPrediction: false,
+                matchReason: 'Active server synchronizer matched this alert.'
+              };
+            });
+            
+            setPendingSmsQueue(mappedQueue);
+          } else {
+            setPendingSmsQueue([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to run active SMS synchronizer matrix:", err);
+      }
+    };
+
+    performSmsLedgerSync();
+  }, [isLocked, !!vaultData]);
 
   // Theme auto-rotate slideshow effect
   useEffect(() => {
@@ -834,6 +953,13 @@ export default function App() {
 
     // Synthesize premium positive confirmation audio
     playSystemSound('success');
+
+    // Asynchronously update backend SMS synchronized ledger
+    fetch('/api/sms/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smsId: smsItem.id })
+    }).catch(err => console.warn("Backend sms dismissal error:", err));
 
     // Remove from the pending queue
     setPendingSmsQueue(prev => prev.filter(item => item.id !== smsItem.id));
@@ -4084,6 +4210,11 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
+                            fetch('/api/sms/dismiss', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ smsId: item.id })
+                            }).catch(err => console.warn("Backend sms dismissal error:", err));
                             setPendingSmsQueue(prev => prev.filter(p => p.id !== item.id));
                             playSystemSound('tick');
                           }}

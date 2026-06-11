@@ -183,18 +183,41 @@ export function calculateWealthRates(
   const lossesPerHour = lossesPerDay / 24;
   const lossesPerFiveYears = lossesPerYear * 5;
 
-  // 3. Net flows
+  // 3. Net compounding rate of actual current money (assets vs debt growth rates)
+  const totalAssetsValConverted = assets.reduce((sum, asset) => {
+    const val = asset.isUSAsset 
+      ? asset.currentValue * (usdRate !== undefined ? usdRate : 83.5)
+      : asset.currentValue;
+    return sum + val;
+  }, 0);
+  
+  const totalLentValForMath = loans
+    .filter(l => l.type === LoanType.LENT)
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
+  
+  const totalBorrowedValForMath = loans
+    .filter(l => l.type === LoanType.BORROWED)
+    .reduce((sum, l) => sum + calculateLoanCurrentBalance(l), 0);
+
+  const activeAssetsCapital = totalAssetsValConverted + totalLentValForMath;
+  
+  const assetsAPYForMath = activeAssetsCapital > 0 
+    ? (totalAnnualPassiveEarnings / activeAssetsCapital) * 100 
+    : 0;
+
+  const borrowedAPYForMath = totalBorrowedValForMath > 0 
+    ? (loansAnnualPassiveCosts / totalBorrowedValForMath) * 100 
+    : 0;
+
   const netPerHour = earningsPerHour - lossesPerHour;
   const netPerDay = earningsPerDay - lossesPerDay;
   const netPerMonth = earningsPerMonth - lossesPerMonth;
   const netPerYear = earningsPerYear - lossesPerYear;
   const netPerFiveYears = earningsPerFiveYears - lossesPerFiveYears;
 
-  // Rate of earning as % of active base or active pool
-  const denom = totalPortfolioValue !== 0 
-    ? Math.abs(totalPortfolioValue) 
-    : (totalAnnualPassiveEarnings > 0 ? totalAnnualPassiveEarnings : 1);
-  const earningsRatePercentOfYear = (netPerYear / denom) * 100;
+  const earningsRatePercentOfYear = (activeAssetsCapital > 0 && totalBorrowedValForMath > 0)
+    ? (assetsAPYForMath - borrowedAPYForMath)
+    : (activeAssetsCapital > 0 ? assetsAPYForMath : -borrowedAPYForMath);
 
   return {
     earningsPerHour,
