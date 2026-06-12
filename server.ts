@@ -18,32 +18,7 @@ async function startServer() {
 
   // In-memory persistent database of unprocessed/synced device transaction alert SMS messages.
   // These represent genuine, parsed system alerts synchronized with on-device/Capacitor systems.
-  let syncedSmsMessages = [
-    {
-      id: "sms-feed-101",
-      rawText: "Alert: Rs. 14,500.00 spent on HDFC Credit Card xx8902 at AMAZON INDIA on 2026-06-10. Avl Lmt Rs 3,45,000.",
-      timestamp: new Date(Date.now() - 3600000 * 20).toISOString(), // 20 hours ago
-      address: "BP-HDFCBK"
-    },
-    {
-      id: "sms-feed-102",
-      rawText: "Your SBI Acct xx9341 debited by Rs. 850.00 via UPI to SWIGGY. Ref No 614059034. If not you, contact bank.",
-      timestamp: new Date(Date.now() - 3600000 * 12).toISOString(), // 12 hours ago
-      address: "VM-SBINQR"
-    },
-    {
-      id: "sms-feed-103",
-      rawText: "Transaction Alert: ₹3,200.00 debited from ICICI Bank Ac xx4728 on 2026-06-11. Info: NFLX SERVICES.",
-      timestamp: new Date(Date.now() - 3600000 * 6).toISOString(), // 6 hours ago
-      address: "AD-ICICIB"
-    },
-    {
-      id: "sms-feed-104",
-      rawText: "Sovereign Pay: INR 45,000.00 debited from Axis Sal Account xx3890 towards Apt Rent payment on 2026-06-08.",
-      timestamp: new Date(Date.now() - 3600000 * 48).toISOString(), // 48 hours ago
-      address: "AXIS-PAY"
-    }
-  ];
+  let syncedSmsMessages: any[] = [];
 
   // API Route: Get all unprocessed synced SMS logs
   app.get("/api/sms/sync", (req, res) => {

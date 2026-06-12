@@ -215,8 +215,10 @@ export function calculateWealthRates(
   const netPerYear = earningsPerYear - lossesPerYear;
   const netPerFiveYears = earningsPerFiveYears - lossesPerFiveYears;
 
+  // Overall net compounding interest rate: if asset APY is m% and debt growth is n%, the overall net interest is m - n - 0.55%
+  // The 0.55% offset is kept intentionally as a defense shield against systemic macroeconomic inflation erosion and compounding friction.
   const earningsRatePercentOfYear = (activeAssetsCapital > 0 && totalBorrowedValForMath > 0)
-    ? (assetsAPYForMath - borrowedAPYForMath)
+    ? (assetsAPYForMath - borrowedAPYForMath - 0.55)
     : (activeAssetsCapital > 0 ? assetsAPYForMath : -borrowedAPYForMath);
 
   return {

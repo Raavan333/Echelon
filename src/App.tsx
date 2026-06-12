@@ -197,7 +197,7 @@ export default function App() {
     matchReason?: string;
   }>>([]);
 
-  const [showOpeningSmsVerify, setShowOpeningSmsVerify] = useState<boolean>(true);
+  const [showOpeningSmsVerify, setShowOpeningSmsVerify] = useState<boolean>(false);
   const [showLoginSmsConsent, setShowLoginSmsConsent] = useState<boolean>(false);
 
   const runSmsPrediction = async (smsId: string, rawText: string) => {
@@ -502,7 +502,7 @@ export default function App() {
       svgStr = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0f1011" stroke="#1c1d1e" stroke-width="2.5" /><polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="#141517" stroke="#d4af37" stroke-width="1.5" /><path d="M32,64 L65,34 M65,34 L54,33 M65,34 L66,45" stroke="#ffeaa7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
     }
 
-    const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgStr);
+    const dataUrl = 'data:image/svg+xml;base64,' + btoa(svgStr);
 
     // Dynamic browser tab favicon sync
     let linkFav: any = document.querySelector("link[rel*='icon']");
@@ -811,7 +811,7 @@ export default function App() {
           setVaultData(parsedData);
           setActivePin(pin);
           setIsLocked(false);
-          setShowLoginSmsConsent(true);
+          setShowLoginSmsConsent(false);
           
           // Sync public icon unencrypted so they appear on Login Screen instantly
           const icon = parsedData.selectedGalleryIcon || 'stealth-matte-gold';
@@ -842,7 +842,7 @@ export default function App() {
         setVaultData(defaults);
         setActivePin(pin);
         setIsLocked(false);
-        setShowLoginSmsConsent(true);
+        setShowLoginSmsConsent(false);
         return true;
       }
     }
@@ -867,7 +867,7 @@ export default function App() {
     setVaultData(initialConfig);
     setActivePin(newPin);
     setIsLocked(false);
-    setShowLoginSmsConsent(true);
+    setShowLoginSmsConsent(false);
   };
 
   // Helper routine to save updated state payload back into offline encrypter
@@ -1812,7 +1812,16 @@ export default function App() {
   const getTriggeredAlerts = () => {
     if (!vaultData || !vaultData.structuredAlertRules) return [];
     
-    const triggered: { rule: AlertRule; message: string; severity: 'warning' | 'info' }[] = [];
+    const triggered: Array<{
+      rule: AlertRule;
+      message: string;
+      severity: 'warning' | 'info';
+      triggerType: 'below_amount' | 'above_amount' | 'below_percent' | 'above_percent' | 'bond_interest' | 'daily_overrun' | 'theme_stabilizer';
+      targetValue: number;
+      currentValue: number;
+      triggerCause: string;
+      assets?: Array<{ name: string; currentValue: number; id: string }>;
+    }> = [];
     const netWorthSum = totalNetWorth;
 
     // ML Cognitive Theme Advisory - adaptive styling evaluation
@@ -1835,7 +1844,12 @@ export default function App() {
             conditionType: 'below_amount'
           },
           message: `${themeAnalysis.description} Recommended Palette: [${themeAnalysis.recommendation.toUpperCase()}]. Turn to the AI Insights tab to auto-tune.`,
-          severity: 'info'
+          severity: 'info',
+          triggerType: 'theme_stabilizer',
+          targetValue: 90,
+          currentValue: themeAnalysis.score,
+          triggerCause: `${themeAnalysis.description} Recommended Palette is [${themeAnalysis.recommendation.toUpperCase()}]. We suggest tuning the active environment color scheme.`,
+          assets: []
         });
       }
     }
@@ -1869,12 +1883,19 @@ export default function App() {
         targetThresholdVal
       );
       
+      const formattedAssets = selectedAssets.map(a => ({ name: a.name, currentValue: a.currentValue, id: a.id }));
+
       if (rule.conditionType === 'below_amount') {
         if (combinedValue < thresholdAmt) {
           triggered.push({
             rule,
             message: `[${namesJoined}] balance is short of target by ${vaultData.currencySymbol || '₹'}${Math.floor(thresholdAmt - combinedValue).toLocaleString()}.`,
-            severity
+            severity,
+            triggerType: 'below_amount',
+            targetValue: thresholdAmt,
+            currentValue: combinedValue,
+            triggerCause: `Aggregate balance got low: current fund level is at ${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()}, falling short of your safeguarding trigger of ${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()} (deficit of ${vaultData.currencySymbol || '₹'}${Math.floor(thresholdAmt - combinedValue).toLocaleString()}).`,
+            assets: formattedAssets
           });
         }
       } else if (rule.conditionType === 'above_amount') {
@@ -1882,7 +1903,12 @@ export default function App() {
           triggered.push({
             rule,
             message: `[${namesJoined}] balance reached target of ${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()}.`,
-            severity
+            severity,
+            triggerType: 'above_amount',
+            targetValue: thresholdAmt,
+            currentValue: combinedValue,
+            triggerCause: `Fund target breached: aggregate balance of ${vaultData.currencySymbol || '₹'}${combinedValue.toLocaleString()} crossed above your configured trigger score of ${vaultData.currencySymbol || '₹'}${thresholdAmt.toLocaleString()} (surplus of ${vaultData.currencySymbol || '₹'}${Math.floor(combinedValue - thresholdAmt).toLocaleString()}).`,
+            assets: formattedAssets
           });
         }
       } else if (rule.conditionType === 'below_percent') {
@@ -1891,16 +1917,26 @@ export default function App() {
           triggered.push({
             rule,
             message: `[${namesJoined}] allocation weight is under target of ${thresholdPct}%.`,
-            severity
+            severity,
+            triggerType: 'below_percent',
+            targetValue: thresholdPct,
+            currentValue: pctOfNetWorth,
+            triggerCause: `Allocation exposure dropped: fund pools make up ${pctOfNetWorth.toFixed(2)}% of total net worth (${vaultData.currencySymbol || '₹'}${Math.floor(netWorthSum).toLocaleString()}), which is below the desired allocation threshold of ${thresholdPct}%.`,
+            assets: formattedAssets
           });
         }
       } else if (rule.conditionType === 'above_percent') {
-        const pctOfNetWorth = netWorthSum > 0 ? (combinedValue / netWorthSum) * 150 / 1.5 * 100 : 0;
+        const pctOfNetWorth = netWorthSum > 0 ? (combinedValue / netWorthSum) * 100 : 0;
         if (pctOfNetWorth > thresholdPct) {
           triggered.push({
             rule,
             message: `[${namesJoined}] concentration is above ceiling limit of ${thresholdPct}%.`,
-            severity
+            severity,
+            triggerType: 'above_percent',
+            targetValue: thresholdPct,
+            currentValue: pctOfNetWorth,
+            triggerCause: `Concentration limit exceeded: asset allocation represents ${pctOfNetWorth.toFixed(2)}% of total net worth (${vaultData.currencySymbol || '₹'}${Math.floor(netWorthSum).toLocaleString()}), crossing past your set safety ceiling of ${thresholdPct}%.`,
+            assets: formattedAssets
           });
         }
       }
@@ -1930,7 +1966,12 @@ export default function App() {
                 isActive: true
               },
               message: `Bond interest payout is due for [${asset.name}] (${vaultData.currencySymbol || '₹'}${asset.bondInterestAmount.toLocaleString()}).`,
-              severity: 'info'
+              severity: 'info',
+              triggerType: 'bond_interest',
+              targetValue: asset.bondInterestAmount,
+              currentValue: asset.bondInterestAmount,
+              triggerCause: `Calendar-based payout triggered: raw scheduled monthly interest payout of ${vaultData.currencySymbol || '₹'}${asset.bondInterestAmount.toLocaleString()} is now due for the sovereign asset fund [${asset.name}].`,
+              assets: [{ name: asset.name, currentValue: asset.currentValue, id: asset.id }]
             });
           }
         }
@@ -1960,7 +2001,12 @@ export default function App() {
             assetIds: []
           },
           message: `Daily expenditures of ${vaultData.currencySymbol || '₹'}${todayExpensesSum.toLocaleString()} exceeded the calculated limit of ${vaultData.currencySymbol || '₹'}${dailyLimit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}.`,
-          severity: 'warning'
+          severity: 'warning',
+          triggerType: 'daily_overrun',
+          targetValue: dailyLimit,
+          currentValue: todayExpensesSum,
+          triggerCause: `Daily expense records show expenditures of ${vaultData.currencySymbol || '₹'}${todayExpensesSum.toLocaleString()} today, which exceeds your computed safe daily threshold of ${vaultData.currencySymbol || '₹'}${Math.floor(dailyLimit).toLocaleString()} (overrun of ${vaultData.currencySymbol || '₹'}${Math.floor(todayExpensesSum - dailyLimit).toLocaleString()}).`,
+          assets: []
         });
       }
     }
@@ -2153,13 +2199,13 @@ export default function App() {
                     </div>
 
                     {/* Active alerts list */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {unacknowledgedAlerts.length === 0 ? (
-                        <div className={`py-4 border border-dashed rounded-xl text-center ${isLight ? 'border-zinc-300' : 'border-stone-800'}`}>
+                        <div className={`py-4 border border-dashed rounded-xl text-center ${isLight ? 'border-zinc-300 bg-stone-50/50' : 'border-stone-800 bg-stone-950/20'}`}>
                           <p className={`text-[11px] font-mono ${isLight ? 'text-emerald-700 font-bold' : 'text-emerald-400'}`}>✓ ALL BOUNDARIES COMPLIANT</p>
                         </div>
                       ) : (
-                        <div className="space-y-2 overflow-hidden">
+                        <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-1">
                           <AnimatePresence initial={false}>
                             {unacknowledgedAlerts.map((alertItem) => {
                               const rule = alertItem.rule;
@@ -2171,24 +2217,119 @@ export default function App() {
                                   exit={{ height: 0, opacity: 0 }}
                                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
                                 >
-                                  <div className={`py-2 px-3 border-l-2 rounded-r-xl flex flex-col gap-2 select-none ${
-                                    isLight ? 'bg-rose-50 border-rose-500' : 'bg-rose-950/15 border-rose-400'
+                                  <div className={`p-3.5 border rounded-xl flex flex-col gap-2.5 transition-all text-xs font-mono relative ${
+                                    isLight 
+                                      ? alertItem.severity === 'warning'
+                                        ? 'bg-rose-50/70 border-rose-200'
+                                        : 'bg-stone-50/80 border-stone-200'
+                                      : alertItem.severity === 'warning'
+                                        ? 'bg-rose-950/10 border-rose-900/40'
+                                        : 'bg-stone-950/40 border-stone-850/60'
                                   }`}>
-                                    <div className="flex-1">
-                                      <p className={`text-xs leading-relaxed font-sans ${isLight ? 'text-stone-900 font-medium' : 'text-stone-200'}`}>{alertItem.message}</p>
-                                      {rule.id.startsWith("bond-interest-payout-") && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleConfirmBondPayment(rule.id, selectedAssets[0]?.id || '');
-                                          }}
-                                          className="mt-1 px-2.5 py-1 bg-emerald-500 hover:bg-emerald-450 text-stone-950 text-[9px] font-mono font-extrabold uppercase rounded transition-all"
-                                        >
-                                          🤝 Confirm Payment Receipt
-                                        </button>
-                                      )}
+                                    
+                                    {/* Card Header & Individual Silence button */}
+                                    <div className="flex items-start justify-between gap-1.5">
+                                      <div className="space-y-0.5 min-w-0 flex-1">
+                                        <span className={`text-[10px] font-bold block uppercase tracking-wide truncate ${isLight ? 'text-stone-850' : 'text-stone-200'}`}>
+                                          🛡️ {rule.name}
+                                        </span>
+                                        <span className="text-[8px] font-sans text-stone-500 uppercase font-bold tracking-wider block">
+                                          Safeguard Profile
+                                        </span>
+                                      </div>
+                                      
+                                      <button
+                                        type="button"
+                                        title="Acknowledge and mute alert for this session"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSessionDismissedAlertIds(prev => [...prev, rule.id]);
+                                        }}
+                                        className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded border transition-all shrink-0 ${
+                                          isLight
+                                            ? 'bg-stone-200 hover:bg-stone-250 border-stone-300 text-stone-700'
+                                            : 'bg-stone-900 hover:bg-stone-800 border-stone-800 text-stone-400 hover:text-stone-250'
+                                        }`}
+                                      >
+                                        Mute ×
+                                      </button>
                                     </div>
+
+                                    {/* Trigger cause text */}
+                                    <div className={`p-2 rounded-lg text-[10.5px] leading-relaxed font-sans ${isLight ? 'bg-white/85 border border-stone-150 text-stone-750' : 'bg-[#0b0c0e]/60 text-stone-300/95'}`}>
+                                      <span className="font-mono font-bold text-amber-500 uppercase text-[8.5px] tracking-wider block mb-0.5">ℹ️ Trigger Event</span>
+                                      {alertItem.triggerCause}
+                                    </div>
+
+                                    {/* Connected funds detailed subview */}
+                                    {alertItem.assets && alertItem.assets.length > 0 && (
+                                      <div className="space-y-1">
+                                        <span className="text-[8.5px] text-stone-500 font-mono uppercase tracking-wider block">Connected Sovereign Funds</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {alertItem.assets.map(asset => (
+                                            <div 
+                                              key={asset.id} 
+                                              className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1.5 ${
+                                                isLight 
+                                                  ? 'bg-stone-100 border-stone-200 text-stone-800' 
+                                                  : 'bg-stone-900/50 border-stone-800 text-stone-250'
+                                              }`}
+                                            >
+                                              <span className="font-semibold truncate max-w-[124px]">{asset.name}</span>
+                                              <span className="font-extrabold text-amber-500 font-mono">
+                                                {(vaultData.currencySymbol || '₹')}{Math.floor(asset.currentValue).toLocaleString()}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Comparison stats widget */}
+                                    {alertItem.triggerType !== 'theme_stabilizer' && alertItem.triggerType !== 'bond_interest' && (
+                                      <div className={`p-2 rounded-lg border flex justify-between items-center text-[10px] font-mono ${
+                                        isLight ? 'bg-stone-50 border-stone-150' : 'bg-stone-950/30 border-stone-850/50'
+                                      }`}>
+                                        <div className="space-y-0.5">
+                                          <span className="text-stone-500 block text-[8px] uppercase font-sans">Current Pool Value</span>
+                                          <span className={`font-black tracking-tight ${isLight ? 'text-stone-900' : 'text-stone-100'}`}>
+                                            {alertItem.triggerType.includes('percent') 
+                                              ? `${alertItem.currentValue.toFixed(2)}%`
+                                              : `${vaultData.currencySymbol || '₹'}${Math.floor(alertItem.currentValue).toLocaleString()}`
+                                            }
+                                          </span>
+                                        </div>
+                                        
+                                        <div className="text-stone-500 select-none text-[10px] font-light">
+                                          {alertItem.currentValue < alertItem.targetValue ? '◀' : '▶'}
+                                        </div>
+
+                                        <div className="space-y-0.5 text-right">
+                                          <span className="text-stone-500 block text-[8px] uppercase font-sans">Trigger Point</span>
+                                          <span className="font-black text-amber-500 tracking-tight">
+                                            {alertItem.triggerType.includes('percent')
+                                              ? `${alertItem.targetValue}%`
+                                              : `${vaultData.currencySymbol || '₹'}${Math.floor(alertItem.targetValue).toLocaleString()}`
+                                            }
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Action items */}
+                                    {rule.id.startsWith("bond-interest-payout-") && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleConfirmBondPayment(rule.id, selectedAssets[0]?.id || '');
+                                        }}
+                                        className="w-full text-center py-1.5 bg-emerald-500 hover:bg-emerald-450 text-stone-950 text-[9px] font-mono font-extrabold uppercase rounded-lg transition-all shadow-md shadow-emerald-950/20"
+                                      >
+                                        🤝 Confirm Payment Receipt
+                                      </button>
+                                    )}
+
                                   </div>
                                 </motion.div>
                               );
@@ -3233,7 +3374,11 @@ export default function App() {
                         <input
                           type="number"
                           min="0"
-                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          className={`w-full border rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all ${
+                            isLight
+                              ? 'bg-white border-stone-250 text-stone-900 focus:border-amber-500'
+                              : 'bg-stone-950 border-stone-800 text-stone-100 focus:border-amber-500/50'
+                          }`}
                           placeholder="Salary"
                           value={vaultData.monthlyEarnings}
                           onChange={(e) => handleSetMonthlyEarnings(parseFloat(e.target.value) || 0)}
@@ -3251,7 +3396,11 @@ export default function App() {
                         <input
                           type="number"
                           min="0"
-                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          className={`w-full border rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all ${
+                            isLight
+                              ? 'bg-white border-stone-250 text-stone-900 focus:border-amber-500'
+                              : 'bg-stone-950 border-stone-800 text-stone-100 focus:border-amber-500/50'
+                          }`}
                           placeholder="Expenses"
                           value={vaultData.userOverriddenExpenses ?? 15000}
                           onChange={(e) => {
@@ -3267,7 +3416,7 @@ export default function App() {
                           className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
                             vaultData.userOverriddenExpenses === undefined
                               ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                              : 'bg-stone-950 border-stone-850 text-stone-500'
+                              : (isLight ? 'bg-stone-100 border-stone-250 text-stone-600' : 'bg-stone-950 border-stone-850 text-stone-500')
                           }`}
                         >
                           Dynamic
@@ -3278,7 +3427,7 @@ export default function App() {
                           className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
                             vaultData.userOverriddenExpenses !== undefined
                               ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                              : 'bg-stone-950 border-stone-850 text-stone-400'
+                              : (isLight ? 'bg-stone-100 border-stone-250 text-stone-600' : 'bg-stone-950 border-stone-850 text-stone-400')
                           }`}
                         >
                           Static Lock
@@ -3296,7 +3445,11 @@ export default function App() {
                         <input
                           type="number"
                           min="0"
-                          className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500/50 text-stone-100 rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all"
+                          className={`w-full border rounded-xl pl-6 pr-3 py-1.5 text-xs font-mono font-bold focus:outline-none transition-all ${
+                            isLight
+                              ? 'bg-white border-stone-250 text-stone-900 focus:border-amber-500'
+                              : 'bg-stone-950 border-stone-800 text-stone-100 focus:border-amber-500/50'
+                          }`}
                           placeholder="Buffer Goal"
                           value={vaultData.customSavingsGoalAmt ?? 5000}
                           onChange={(e) => {
@@ -3392,22 +3545,30 @@ export default function App() {
                 </div>
 
                 {/* 3. Budget categories list for threshold alert editing */}
-                <div className="p-4 rounded-xl border border-stone-850/50 space-y-3">
-                  <span className="text-xs font-bold text-stone-300 block">Custom Budget Category Quotas</span>
+                <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-stone-50 border-stone-200' : 'border-stone-850/50 bg-[#0d0d11]/20'}`}>
+                  <span className={`text-xs font-bold block ${isLight ? 'text-stone-800' : 'text-stone-300'}`}>Custom Budget Category Quotas</span>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="e.g. Entertainment, Health"
                       value={modalCatName}
                       onChange={(e) => setModalCatName(e.target.value)}
-                      className="w-1/2 px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-white rounded-lg outline-none"
+                      className={`w-1/2 px-2.5 py-1.5 border text-xs rounded-lg outline-none ${
+                        isLight
+                          ? 'bg-white border-stone-250 text-stone-900 placeholder-stone-400 focus:border-amber-500'
+                          : 'bg-stone-950 border-stone-800 text-white placeholder-stone-600 focus:border-amber-500/50'
+                      }`}
                     />
                     <input
                       type="number"
                       placeholder="Limit INR"
                       value={modalCatLimit}
                       onChange={(e) => setModalCatLimit(e.target.value)}
-                      className="w-1/2 px-2.5 py-1.5 bg-stone-950 border border-stone-800 text-xs text-white rounded-lg outline-none"
+                      className={`w-1/2 px-2.5 py-1.5 border text-xs rounded-lg outline-none ${
+                        isLight
+                          ? 'bg-white border-stone-250 text-stone-900 placeholder-stone-400 focus:border-amber-500'
+                          : 'bg-stone-950 border-stone-800 text-white placeholder-stone-600 focus:border-amber-500/50'
+                      }`}
                     />
                     <button 
                       type="button"
@@ -3434,8 +3595,8 @@ export default function App() {
                       <span className="text-[10px] text-stone-500 italic block">No customized categories defined. System falls back to defaults.</span>
                     ) : (
                       (vaultData.budgetCategoryLimits || []).map((c) => (
-                        <div key={c.category} className="flex items-center justify-between bg-stone-950/40 p-1.5 px-2 rounded-lg text-xs">
-                          <span className="font-semibold text-stone-300">{c.category}: <strong className="font-mono text-amber-500 font-semibold">{(vaultData.currencySymbol || '₹')}{c.limit.toLocaleString()}</strong></span>
+                        <div key={c.category} className={`flex items-center justify-between p-1.5 px-2 rounded-lg text-xs border ${isLight ? 'bg-stone-100 border-stone-200 text-stone-850' : 'bg-stone-950/40 border-stone-800/40 text-stone-300'}`}>
+                          <span className="font-semibold">{c.category}: <strong className="font-mono text-amber-500 font-semibold">{(vaultData.currencySymbol || '₹')}{c.limit.toLocaleString()}</strong></span>
                           <button
                             type="button"
                             onClick={() => {
@@ -3453,14 +3614,14 @@ export default function App() {
                 </div>
 
                 {/* 4. Interactive Guardrail Alerts builder */}
-                <div className="p-4 rounded-xl border border-stone-850/50 space-y-4">
+                <div className={`p-4 rounded-xl border space-y-4 ${isLight ? 'bg-stone-50 border-stone-200' : 'border-stone-850/50 bg-[#0d0d11]/20'}`}>
                   <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-stone-300 block">Sovereign Guardian Portfolio Alerts</span>
+                    <span className={`text-xs font-bold block ${isLight ? 'text-stone-800' : 'text-stone-300'}`}>Sovereign Guardian Portfolio Alerts</span>
                     <p className="text-[10px] text-stone-500 font-mono leading-relaxed">Configure precise multi-asset or single-asset alerts based on custom amounts or net worth percentage thresholds.</p>
                   </div>
 
                   {/* Add Alert Rule Form */}
-                  <div className="p-3 bg-stone-950/60 border border-stone-850 rounded-xl space-y-3">
+                  <div className={`p-3 border rounded-xl space-y-3 ${isLight ? 'bg-white border-stone-200' : 'bg-stone-950/60 border-stone-850'}`}>
                     <span className="text-[10px] uppercase font-bold text-amber-500 font-mono block">Configure New Notification Safeguard</span>
                     
                     {/* Alert Name */}
@@ -3471,7 +3632,11 @@ export default function App() {
                         placeholder="e.g. Fixed Deposit Threshold Safety"
                         value={newAlertName}
                         onChange={(e) => setNewAlertName(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-800 text-xs text-white rounded-lg outline-none font-mono"
+                        className={`w-full px-2.5 py-1.5 border text-xs rounded-lg outline-none font-mono ${
+                          isLight
+                            ? 'bg-stone-50 border-stone-250 text-stone-900 placeholder-stone-400 focus:border-amber-500/50'
+                            : 'bg-stone-900 border-stone-800 text-white placeholder-stone-600 focus:border-amber-500/50'
+                        }`}
                       />
                     </div>
 
@@ -3497,11 +3662,11 @@ export default function App() {
                       {vaultData.assets.length === 0 ? (
                         <p className="text-[10px] text-stone-500 font-mono italic">No assets registered yet. Add fields inside the Assets page.</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-stone-900 rounded-lg border border-stone-800">
+                        <div className={`grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto p-1.5 rounded-lg border ${isLight ? 'bg-stone-50 border-stone-200' : 'bg-stone-900 border-stone-800'}`}>
                           {vaultData.assets.map(asset => {
                             const isChecked = newAlertAssetIds.includes(asset.id);
                             return (
-                              <label key={asset.id} className="flex items-center gap-1.5 cursor-pointer text-[10px] text-stone-300">
+                              <label key={asset.id} className={`flex items-center gap-1.5 cursor-pointer text-[10px] ${isLight ? 'text-stone-700 hover:text-stone-900' : 'text-stone-300 hover:text-stone-100'}`}>
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
@@ -3512,7 +3677,7 @@ export default function App() {
                                       setNewAlertAssetIds([...newAlertAssetIds, asset.id]);
                                     }
                                   }}
-                                  className="rounded border-stone-800 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-stone-950 h-3 w-3"
+                                  className={`rounded border focus:ring-0 focus:ring-offset-0 h-3 w-3 ${isLight ? 'border-stone-300 bg-white text-amber-500' : 'border-stone-800 bg-stone-950 text-amber-500'}`}
                                 />
                                 <span className="truncate font-mono" title={asset.name}>{asset.name}</span>
                               </label>
@@ -3529,7 +3694,11 @@ export default function App() {
                         <select
                           value={newAlertConditionType}
                           onChange={(e: any) => setNewAlertConditionType(e.target.value)}
-                          className="w-full px-2 py-1.5 bg-stone-900 border border-stone-800 text-xs text-stone-300 rounded-lg outline-none font-mono"
+                          className={`w-full px-2 py-1.5 border text-xs rounded-lg outline-none font-mono ${
+                            isLight
+                              ? 'bg-stone-50 border-stone-250 text-stone-900'
+                              : 'bg-stone-900 border-stone-800 text-stone-300'
+                          }`}
                         >
                           <option value="below_amount">Falls below Threshold Amount</option>
                           <option value="above_amount">Crosses above Threshold Amount</option>
@@ -3547,7 +3716,11 @@ export default function App() {
                           placeholder={newAlertConditionType.includes('percent') ? 'e.g. 20' : 'e.g. 50000'}
                           value={newAlertThresholdValue}
                           onChange={(e) => setNewAlertThresholdValue(e.target.value)}
-                          className="w-full px-2 py-1.5 bg-stone-900 border border-stone-800 text-xs text-white rounded-lg outline-none font-mono font-bold"
+                          className={`w-full px-2 py-1.5 border text-xs rounded-lg outline-none font-mono font-bold ${
+                            isLight
+                              ? 'bg-stone-50 border-stone-250 text-stone-900 placeholder-stone-400 focus:border-amber-500/50'
+                              : 'bg-stone-900 border-stone-800 text-white placeholder-stone-600 focus:border-amber-500/50'
+                          }`}
                         />
                       </div>
                     </div>

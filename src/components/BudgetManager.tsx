@@ -691,7 +691,7 @@ export default function BudgetManager({
                   placeholder={`${currencySymbol} Amount`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 ${tokens.border} text-stone-200`}`}
                 />
               </div>
 
@@ -703,7 +703,7 @@ export default function BudgetManager({
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 ${tokens.border} text-stone-200`}`}
                 />
               </div>
 
@@ -715,7 +715,7 @@ export default function BudgetManager({
                   placeholder="e.g. Weekly organic farm veggies"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 border-${tokens.border} text-stone-200`}`}
+                  className={`w-full px-2.5 py-1.5 border rounded-xl text-xs focus:outline-none ${isLight ? 'bg-white border-stone-250 text-stone-900' : `bg-stone-900 ${tokens.border} text-stone-200`}`}
                 />
               </div>
 

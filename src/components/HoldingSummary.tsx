@@ -831,8 +831,8 @@ export default function HoldingSummary({
             </div>
 
             {/* Explainer note defending correct math */}
-            <p className="text-[8px] leading-relaxed text-stone-500 font-sans italic">
-              ℹ️ <span className="font-bold">ARCHITECTURAL TRUTH:</span> This project excludes future unearned salary projections. Because salary for the rest of year does not exist yet today, blending it into portfolio interest return rates creates mathematical illusion. This board separates asset compound rate ({blendedAPY.toFixed(2)}%) from spending-drain velocities.
+            <p className="text-[8.5px] leading-relaxed text-stone-500 font-sans italic">
+              ℹ️ <span className="font-bold">ARCHITECTURAL TRUTH:</span> This project excludes future unearned salary projections. Here, overall net interest translates to asset compounding rate (m%) minus debt growth (n%) with an intentional <strong className="text-amber-500/80">0.55% defensive buffer</strong> subtracted to fight macroeconomic inflation and compound friction. This yields a calibrated rate of {blendedAPY.toFixed(2)}% to guard your sovereign net worth.
             </p>
           </div>
 
